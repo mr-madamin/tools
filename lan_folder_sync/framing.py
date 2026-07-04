@@ -17,3 +17,11 @@ def recv_exactly(conn, n):
 def send_msg(conn, payload: bytes):
     header = struct.pack("!I", len(payload))
     conn.sendall(header + payload)
+
+
+def recv_msg(conn):
+    header = recv_exactly(conn, 4)
+    if header is None:
+        return None
+    (length,) = struct.unpack("!I", header)
+    return recv_exactly(conn, length)
