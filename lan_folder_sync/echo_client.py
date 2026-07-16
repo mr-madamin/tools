@@ -1,5 +1,6 @@
 import socket
 import sys
+from framing import send_msg, recv_msg
 
 HOST = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
 PORT = 8765
@@ -18,10 +19,10 @@ def main():
             if line == "" or line == "quit":
                 break
 
-            client_sock.sendall(line.encode("utf-8"))
+            send_msg(client_sock, line.encode("utf-8"))
 
-            reply = client_sock.recv(8)
-            if not reply:
+            reply = recv_msg(client_sock)
+            if reply is None:
                 print("Server closed the connection.")
                 break
             print(f" echo: {reply.decode('utf-8')}")

@@ -1,4 +1,5 @@
 import socket
+from framing import send_msg, recv_msg
 
 HOST = ""
 PORT = 8765
@@ -21,14 +22,14 @@ def main():
 
             with conn:
                 while True:
-                    data = conn.recv(8)
+                    data = recv_msg(conn)
 
-                    if not data:
+                    if data is None:
                         print(f"Client {addr[0]} disconnected.")
                         break
 
                     print(f" received {len(data)} bytes: {data!r}")
-                    conn.sendall(data)
+                    send_msg(conn, data)
     except KeyboardInterrupt:
         print("\nShutting down.")
     finally:
