@@ -15,3 +15,11 @@ Posterizing time gives animations or footage a choppy, stop-motion look by reduc
 ```js
 posterizeTime(12)
 ```
+
+## Repeat
+
+### Repeating animations without keyframes
+
+```js
+loopOut(type = 'cycle', numKeyframes = 0)
+```
