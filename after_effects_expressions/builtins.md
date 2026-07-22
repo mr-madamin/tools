@@ -29,3 +29,11 @@ loopOut(type = 'cycle', numKeyframes = 0)
 ```js
 wiggle(1, 50)
 ```
+
+## Math
+
+### Math.round()
+
+```js
+Math.round(effect("Slider Control")("Slider"))
+```
