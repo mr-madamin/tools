@@ -23,3 +23,9 @@ posterizeTime(12)
 ```js
 loopOut(type = 'cycle', numKeyframes = 0)
 ```
+
+## Wiggle
+
+```js
+wiggle(1, 50)
+```
