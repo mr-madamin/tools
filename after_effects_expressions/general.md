@@ -67,3 +67,13 @@ Displays a rounded slider value as text — handy for animated counters.
 ```js
 Math.round(effect("Slider Control")("Slider")).toString()
 ```
+
+## Index
+
+### Layer-index-driven variation
+
+`index` is the layer's position in the stack (1-based). Useful for giving duplicated layers slightly different behavior without editing each expression by hand.
+
+```js
+value + index * 10
+```
