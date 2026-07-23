@@ -57,3 +57,22 @@ Adds jittery movement/variation to a property. First argument is frequency (wigg
 ```js
 wiggle(1, 50)
 ```
+
+### Consistent (repeatable) randomness
+
+`seedRandom` locks the random sequence so every layer doesn't wiggle identically, and so re-rendering doesn't change the result. `timeless = true` keeps it fixed regardless of playhead position.
+
+```js
+seedRandom(index, true);
+wiggle(2, 30)
+```
+
+## Math
+
+### Math.round()
+
+Rounds a value to the nearest whole number — handy for snapping a slider-driven value to whole units (e.g. frame counts, integer counters).
+
+```js
+Math.round(effect("Slider Control")("Slider"))
+```
