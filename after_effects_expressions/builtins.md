@@ -76,3 +76,31 @@ Rounds a value to the nearest whole number — handy for snapping a slider-drive
 ```js
 Math.round(effect("Slider Control")("Slider"))
 ```
+
+### clamp()
+
+Restricts a value to a minimum/maximum range, useful for keeping opacity, scale, or effect values from overshooting.
+
+```js
+clamp(value, 0, 100)
+```
+
+### linear() / ease()
+
+Remaps a value from one range to another. `linear` is a constant rate of change; `ease` applies smooth acceleration/deceleration at the ends. Great for driving one property off another (e.g. opacity fading in/out based on position, or a slider controlling multiple properties).
+
+```js
+// as time goes from 0s to 1s, opacity goes from 0 to 100
+linear(time, 0, 1, 0, 100)
+
+// same, but with easing at the start/end
+ease(time, 0, 1, 0, 100)
+```
+
+### random()
+
+Returns a random number (or array, for multi-dimensional properties) each frame. Without arguments it returns a float between 0 and 1; with arguments it returns a value within that range.
+
+```js
+random(0, 100)
+```
