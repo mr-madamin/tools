@@ -1,4 +1,6 @@
 import struct
+import json
+import os
 
 
 def recv_exactly(conn, n):
@@ -29,3 +31,17 @@ def recv_msg(conn):
         return None
     (length,) = struct.unpack("!I", header)
     return recv_exactly(conn, length)
+
+
+def send_file(conn, path):
+    size = os.path.getsize(path)
+    meta = json.dumps({"name": os.path.basename(path), "size": size}).encode("utf-8")
+
+    send_msg(conn, meta)
+
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(65536)
+            if chunk == b"":
+                break
+            conn.sendall(chunk)
