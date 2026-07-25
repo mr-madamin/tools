@@ -45,3 +45,25 @@ def send_file(conn, path):
             if chunk == b"":
                 break
             conn.sendall(chunk)
+
+
+def recv_file(conn, dest_dir):
+    meta_bytes = recv_msg(conn)
+    if meta_bytes is None:
+        return None
+
+    meta = json.loads(meta_bytes.decode("utf-8"))
+    name = meta["name"]
+    size = meta["size"]
+    file_path = os.path.join(dest_dir, name)
+
+    bytes_received = 0
+    with open(file_path, "wb") as f:
+        while bytes_received < size:
+            chunk = conn.recv(min(65536, size - bytes_received))
+            if chunk == b"":
+                raise ConnectionError("peer closed mid-file - truncated transfer")
+            f.write(chunk)
+            bytes_received += len(chunk)
+
+    return file_path
