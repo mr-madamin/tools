@@ -51,17 +51,22 @@ def send_file(conn, root_dir, rel_path):
 
 
 def recv_file(conn, dest_dir):
+    """Receive one PUT into dest_dir, rebuilding subfolders and restoring mtime.
+    Returns the relative path written, or None on clean EOF."""
     meta_bytes = recv_msg(conn)
     if meta_bytes is None:
         return None
 
     meta = json.loads(meta_bytes.decode("utf-8"))
-    name = meta["name"]
+    rel_path = meta["path"]
     size = meta["size"]
-    file_path = os.path.join(dest_dir, name)
+    mtime = meta["mtime"]
+
+    full_path = os.path.join(dest_dir, rel_path)
+    os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
     bytes_received = 0
-    with open(file_path, "wb") as f:
+    with open(full_path, "wb") as f:
         while bytes_received < size:
             chunk = conn.recv(min(65536, size - bytes_received))
             if chunk == b"":
@@ -69,7 +74,8 @@ def recv_file(conn, dest_dir):
             f.write(chunk)
             bytes_received += len(chunk)
 
-    return file_path
+    os.utime(full_path, (mtime, mtime))
+    return rel_path
 
 
 def build_manifest(root_dir):
