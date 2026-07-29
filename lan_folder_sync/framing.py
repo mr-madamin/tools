@@ -38,9 +38,7 @@ def send_file(conn, root_dir, rel_path):
     full_path = os.path.join(root_dir, rel_path)
     size = os.path.getsize(full_path)
     mtime = os.path.getmtime(full_path)
-    meta = json.dumps(
-        {"name": os.path.basename(rel_path), "size": size, "mtime": mtime}
-    ).encode("utf-8")
+    meta = json.dumps({"path": rel_path, "size": size, "mtime": mtime}).encode("utf-8")
 
     send_msg(conn, meta)
 
