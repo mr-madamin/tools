@@ -81,3 +81,23 @@ def build_manifest(root_dir):
             info = os.stat(full_path)
             manifest[rel_path] = {"size": info.st_size, "mtime": info.st_mtime}
     return manifest
+
+
+def diff_manifests(local, remote, mtime_tolerance=2):
+    """Compare local vs remote manifest. Return (to_put, to_delete).
+
+    to_put      = paths we should send: missing on remote, or size/mtime differ.
+    to_delete   = paths on remote but not local (deletion candidates).
+    """
+    to_put = []
+    for path, info in local.items():
+        remote_info = remote.get(path)
+        if remote_info is None:
+            to_put.append(path)
+        elif info["size"] != remote_info["size"]:
+            to_put.append(path)
+        elif abs(info["mtime"] - remote_info["mtime"]) > mtime_tolerance:
+            to_put.append(path)
+
+    to_delete = [path for path in remote if path not in local]
+    return to_put, to_delete
