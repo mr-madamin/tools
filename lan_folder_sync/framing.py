@@ -67,3 +67,17 @@ def recv_file(conn, dest_dir):
             bytes_received += len(chunk)
 
     return file_path
+
+
+def build_manifest(root_dir):
+    """Walk root_dir and return a manifest:
+    { relative_path: {"size": int, "mtime": float}, ... }
+    keyed by each file's path *relative to root_dir*."""
+    manifest = {}
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        for filename in filenames:
+            full_path = os.path.join(dirpath, filename)
+            rel_path = os.path.relpath(full_path, root_dir)
+            info = os.stat(full_path)
+            manifest[rel_path] = {"size": info.st_size, "mtime": info.st_mtime}
+    return manifest
