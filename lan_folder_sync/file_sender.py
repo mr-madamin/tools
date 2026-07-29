@@ -8,6 +8,6 @@ path = sys.argv[2] if len(sys.argv) > 2 else "bigfile.bin"
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((HOST, PORT))
-send_file(sock, path)
+send_file(sock, ".", path)
 print(f"Sent {path}")
 sock.close()
