@@ -33,13 +33,18 @@ def recv_msg(conn):
     return recv_exactly(conn, length)
 
 
-def send_file(conn, path):
-    size = os.path.getsize(path)
-    meta = json.dumps({"name": os.path.basename(path), "size": size}).encode("utf-8")
+def send_file(conn, root_dir, rel_path):
+    """Send one file as a PUT: JSON header {path, size, mtime}, then raw body."""
+    full_path = os.path.join(root_dir, rel_path)
+    size = os.path.getsize(full_path)
+    mtime = os.path.getmtime(full_path)
+    meta = json.dumps(
+        {"name": os.path.basename(rel_path), "size": size, "mtime": mtime}
+    ).encode("utf-8")
 
     send_msg(conn, meta)
 
-    with open(path, "rb") as f:
+    with open(full_path, "rb") as f:
         while True:
             chunk = f.read(65536)
             if chunk == b"":
