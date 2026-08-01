@@ -1,7 +1,7 @@
 import socket
 import json
 
-from framing import send_msg, recv_msg, build_manifest
+from framing import send_msg, recv_msg, build_manifest, recv_file_body
 
 SHARED_DIR = "received"
 PORT = 8765
@@ -26,6 +26,9 @@ while True:
             reply = json.dumps({"op": "MANIFEST", "files": manifest}).encode("utf-8")
             send_msg(conn, reply)
             print(f"Sent manifest ({len(manifest)} files)")
+        elif op == "PUT":
+            rel_path = recv_file_body(conn, SHARED_DIR, header)
+            print(f"    received {rel_path}")
         elif op == "BYE":
             print("Peer said BYE")
             break
