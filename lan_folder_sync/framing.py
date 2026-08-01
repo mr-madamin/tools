@@ -50,17 +50,11 @@ def send_file(conn, root_dir, rel_path):
             conn.sendall(chunk)
 
 
-def recv_file(conn, dest_dir):
-    """Receive one PUT into dest_dir, rebuilding subfolders and restoring mtime.
-    Returns the relative path written, or None on clean EOF."""
-    meta_bytes = recv_msg(conn)
-    if meta_bytes is None:
-        return None
-
-    meta = json.loads(meta_bytes.decode("utf-8"))
-    rel_path = meta["path"]
-    size = meta["size"]
-    mtime = meta["mtime"]
+def recv_file_body(conn, dest_dir, header):
+    """Write the raw body that follows a PUT header. header already parsed."""
+    rel_path = header["path"]
+    size = header["size"]
+    mtime = header["mtime"]
 
     full_path = os.path.join(dest_dir, rel_path)
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
@@ -76,6 +70,15 @@ def recv_file(conn, dest_dir):
 
     os.utime(full_path, (mtime, mtime))
     return rel_path
+
+
+def recv_file(conn, dest_dir):
+    """Read a PUT header, then its body."""
+    header_bytes = recv_msg(conn)
+    if header_bytes is None:
+        return None
+    header = json.loads(header_bytes.decode("utf-8"))
+    return recv_file_body(conn, dest_dir, header)
 
 
 def build_manifest(root_dir):
