@@ -67,6 +67,40 @@ seedRandom(index, true);
 wiggle(2, 30)
 ```
 
+### Wiggling only one axis
+
+Runs `wiggle` on the full property, then swaps back in the original value for the axis you don't want jittered — here only Y moves, X stays put.
+
+```js
+w = wiggle(2, 50);
+[value[0], w[1]]
+```
+
+### Layering wiggle on top of existing keyframes
+
+Because `wiggle` returns a value relative to the property's current value, adding it to an offset (rather than replacing the property outright) preserves any keyframed animation underneath while adding jitter on top.
+
+```js
+value + wiggle(3, 15) - value
+```
+
+### Extra octaves for more detailed/organic noise
+
+Third argument (`octaves`) layers additional, higher-frequency wiggles on top of the base one for a more complex, less mechanical result. Fourth argument (`amp_mult`) controls how much each extra octave's amplitude falls off (default `0.5`).
+
+```js
+wiggle(2, 30, 4, 0.5)
+```
+
+### Fading wiggle in/out over time
+
+Multiplies the wiggle offset by a 0–1 ramp from `linear`/`ease`, so jitter can build up or settle down instead of being constant for the whole layer duration.
+
+```js
+amount = ease(time, 0, 2, 0, 1); // ramps up over the first 2 seconds
+value + (wiggle(2, 50) - value) * amount
+```
+
 ## Math
 
 ### Math.round()
