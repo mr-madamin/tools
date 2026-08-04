@@ -18,6 +18,11 @@ def recv_exactly(conn, n):
     return b"".join(chunks)
 
 
+def send_error(conn, message):
+    reply = json.dumps({"op": "ERROR", "message": message}).encode("utf-8")
+    send_msg(conn, reply)
+
+
 def send_msg(conn, payload: bytes):
     """Frame and send: 4-byte big-endian length prefix, then the payload."""
     header = struct.pack("!I", len(payload))
