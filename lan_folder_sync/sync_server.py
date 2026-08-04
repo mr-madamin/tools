@@ -1,7 +1,7 @@
 import socket
 import json
 
-from framing import send_msg, recv_msg, build_manifest, recv_file_body
+from framing import send_error, send_msg, recv_msg, build_manifest, recv_file_body
 
 SHARED_DIR = "received"
 PORT = 8765
@@ -20,7 +20,13 @@ while True:
             header_bytes = recv_msg(conn)
             if header_bytes is None:
                 break  # peer vanished
-            header = json.loads(header_bytes.decode("utf-8"))
+
+            try:
+                header = json.loads(header_bytes.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                send_error(conn, "malformed header: not valid UTF-8 JSON")
+                break
+
             op = header["op"]
             if op == "MANIFEST":
                 manifest = build_manifest(SHARED_DIR)
