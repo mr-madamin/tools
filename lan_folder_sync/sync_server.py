@@ -15,22 +15,28 @@ print(f"Serving {SHARED_DIR}/ on {PORT} ... (Ctrl-C to stop)")
 while True:
     conn, addr = sock.accept()
     print(f"Connected from {addr[0]}:{addr[1]}")
-    while True:
-        header_bytes = recv_msg(conn)
-        if header_bytes is None:
-            break  # peer vanished
-        header = json.loads(header_bytes.decode("utf-8"))
-        op = header["op"]
-        if op == "MANIFEST":
-            manifest = build_manifest(SHARED_DIR)
-            reply = json.dumps({"op": "MANIFEST", "files": manifest}).encode("utf-8")
-            send_msg(conn, reply)
-            print(f"Sent manifest ({len(manifest)} files)")
-        elif op == "PUT":
-            rel_path = recv_file_body(conn, SHARED_DIR, header)
-            print(f"    received {rel_path}")
-        elif op == "BYE":
-            print("Peer said BYE")
-            break
-    conn.close()
-    print("Session ended, waiting for next peer")
+    try:
+        while True:
+            header_bytes = recv_msg(conn)
+            if header_bytes is None:
+                break  # peer vanished
+            header = json.loads(header_bytes.decode("utf-8"))
+            op = header["op"]
+            if op == "MANIFEST":
+                manifest = build_manifest(SHARED_DIR)
+                reply = json.dumps({"op": "MANIFEST", "files": manifest}).encode(
+                    "utf-8"
+                )
+                send_msg(conn, reply)
+                print(f"Sent manifest ({len(manifest)} files)")
+            elif op == "PUT":
+                rel_path = recv_file_body(conn, SHARED_DIR, header)
+                print(f"    received {rel_path}")
+            elif op == "BYE":
+                print("Peer said BYE")
+                break
+    except ConnectionError as e:
+        print(f"Session error: {e}")
+    finally:
+        conn.close()
+        print("Session ended, waiting for next peer")
