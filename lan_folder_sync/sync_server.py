@@ -36,11 +36,18 @@ while True:
                 send_msg(conn, reply)
                 print(f"Sent manifest ({len(manifest)} files)")
             elif op == "PUT":
-                rel_path = recv_file_body(conn, SHARED_DIR, header)
+                try:
+                    rel_path = recv_file_body(conn, SHARED_DIR, header)
+                except KeyError as e:
+                    send_error(conn, f"PUT header missing field: {e}")
+                    break  # body size unknown - can't resync the stream
                 print(f"    received {rel_path}")
             elif op == "BYE":
                 print("Peer said BYE")
                 break
+            else:
+                send_error(conn, f"unknown op: {op!r}")
+                break  # unknown frame
     except ConnectionError as e:
         print(f"Session error: {e}")
     finally:
