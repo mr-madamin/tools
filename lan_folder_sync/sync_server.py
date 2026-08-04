@@ -27,7 +27,7 @@ while True:
                 send_error(conn, "malformed header: not valid UTF-8 JSON")
                 break
 
-            op = header["op"]
+            op = header.get("op")
             if op == "MANIFEST":
                 manifest = build_manifest(SHARED_DIR)
                 reply = json.dumps({"op": "MANIFEST", "files": manifest}).encode(
