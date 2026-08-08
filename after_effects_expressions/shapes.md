@@ -48,6 +48,23 @@ content("Shape 1").content("Path 1").path.pointOnPath(0.5)
 
 `tangentOnPath(t)` and `normalOnPath(t)` return the direction/perpendicular vectors at that same point — handy for orienting a layer to follow the path.
 
+### Generate a path procedurally
+
+`createPath(points, inTangents, outTangents, is_closed)` builds a path from scratch, so you can drive the vertices themselves with math instead of hand-drawing a shape — e.g. a regular polygon whose side count and radius come from Slider Controls. Apply to the Path property itself.
+
+```js
+sides = Math.round(effect("Sides")("Slider"));
+radius = effect("Radius")("Slider");
+pts = [];
+for (i = 0; i < sides; i++) {
+  angle = (i / sides) * Math.PI * 2 - Math.PI / 2;
+  pts.push([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+}
+createPath(pts, [], [], true)
+```
+
+Leave `inTangents`/`outTangents` as empty arrays for straight edges, or fill them per-vertex to get curves (e.g. an animated blob).
+
 ## Repeater
 
 ### Offset color or scale across repeated copies
