@@ -20,6 +20,8 @@ local = build_manifest(ROOT_DIR)
 
 send_msg(sock, json.dumps({"op": "MANIFEST"}).encode("utf-8"))
 reply = recv_msg(sock)
+if reply is None:
+    sys.exit("Connection closed by peer before manifest was received")
 remote = json.loads(reply.decode("utf-8"))["files"]
 
 to_put, to_delete = diff_manifests(local, remote)
