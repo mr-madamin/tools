@@ -17,6 +17,7 @@ def remote_manifest():
     send_msg(s, json.dumps({"op": "MANIFEST"}).encode("utf-8"))
     reply = recv_msg(s)
     s.close()
+    assert reply is not None, "server closed without sending a manifest"
     return json.loads(reply.decode("utf-8"))["files"]
 
 
@@ -35,6 +36,7 @@ try:
         ["python3", "sync_push.py", HOST, ROOT_DIR, "--dry-run"],
         capture_output=True,
         text=True,
+        check=False,
     )
     print(result.stdout, end="")
     assert result.returncode == 0, f"push crashed:\n{result.stderr}"
