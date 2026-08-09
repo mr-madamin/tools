@@ -1,8 +1,8 @@
+import json
 import socket
 import sys
-import json
 
-from framing import send_msg, recv_msg, build_manifest, diff_manifests, send_file
+from framing import build_manifest, diff_manifests, recv_msg, send_file, send_msg
 
 flags = {a for a in sys.argv[1:] if a.startswith("--")}
 positional = [a for a in sys.argv[1:] if not a.startswith("--")]

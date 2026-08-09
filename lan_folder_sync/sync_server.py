@@ -1,7 +1,7 @@
-import socket
 import json
+import socket
 
-from framing import send_error, send_msg, recv_msg, build_manifest, recv_file_body
+from framing import build_manifest, recv_file_body, recv_msg, send_error, send_msg
 
 SHARED_DIR = "received"
 PORT = 8765

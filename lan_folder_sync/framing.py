@@ -1,6 +1,6 @@
-import struct
 import json
 import os
+import struct
 
 
 def recv_exactly(conn, n):
