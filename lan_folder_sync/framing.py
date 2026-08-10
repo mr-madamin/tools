@@ -111,12 +111,18 @@ def diff_manifests(local, remote, mtime_tolerance=2):
     to_put = []
     for path, info in local.items():
         remote_info = remote.get(path)
-        if remote_info is None:
-            to_put.append(path)
-        elif info["size"] != remote_info["size"]:
-            to_put.append(path)
-        elif abs(info["mtime"] - remote_info["mtime"]) > mtime_tolerance:
+        if (
+            remote_info is None
+            or info["size"] != remote_info["size"]
+            or abs(info["mtime"] - remote_info["mtime"]) > mtime_tolerance
+        ):
             to_put.append(path)
 
     to_delete = [path for path in remote if path not in local]
     return to_put, to_delete
+
+
+def send_delete(conn, rel_path):
+    """Ask the peer to remove one file (no body)."""
+    msg = json.dumps({"op": "DELETE", "path": rel_path}).encode("utf-8")
+    send_msg(conn, msg)

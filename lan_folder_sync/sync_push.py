@@ -2,7 +2,14 @@ import json
 import socket
 import sys
 
-from framing import build_manifest, diff_manifests, recv_msg, send_file, send_msg
+from framing import (
+    build_manifest,
+    diff_manifests,
+    recv_msg,
+    send_delete,
+    send_file,
+    send_msg,
+)
 
 flags = {a for a in sys.argv[1:] if a.startswith("--")}
 positional = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -12,6 +19,7 @@ PORT = 8765
 ROOT_DIR = positional[1] if len(positional) > 1 else "source"
 
 dry_run = "--dry-run" in flags
+delete = "--delete" in flags
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((HOST, PORT))
@@ -37,9 +45,17 @@ for path in to_put:
         send_file(sock, ROOT_DIR, path)
 
 if to_delete:
-    print(f"Skipping {len(to_delete)} delete(s) — need --delete:")
+    if dry_run:
+        verb = "Would delete"
+    elif delete:
+        verb = "Deleting"
+    else:
+        verb = "Skipping (need --delete):"
+    print(f"{verb} {len(to_delete)} file(s):")
     for path in to_delete:
         print(f"   DELETE {path}")
+        if not dry_run and delete:
+            send_delete(sock, path)
 
 send_msg(sock, json.dumps({"op": "BYE"}).encode("utf-8"))
 sock.close()
