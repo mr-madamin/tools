@@ -1,4 +1,5 @@
 import json
+import os
 import socket
 
 from framing import build_manifest, recv_file_body, recv_msg, send_error, send_msg
@@ -45,6 +46,23 @@ while True:
             elif op == "BYE":
                 print("Peer said BYE")
                 break
+            elif op == "DELETE":
+                rel_path = header.get("path")
+                if rel_path is None:
+                    send_error(conn, "DELETE missing 'path'")
+                    break
+
+                base = os.path.realpath(SHARED_DIR)
+                target = os.path.realpath(os.path.join(base, rel_path))
+                if target != base and not target.startswith(base + os.sep):
+                    send_error(conn, f"unsafe path refused: {rel_path!r}")
+                    break
+
+                try:
+                    os.remove(target)
+                    print(f"    deleted {rel_path}")
+                except FileNotFoundError:
+                    print(f"    already gone {rel_path}")  # delete is idempotent
             else:
                 send_error(conn, f"unknown op: {op!r}")
                 break  # unknown frame
