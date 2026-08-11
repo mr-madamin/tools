@@ -51,12 +51,19 @@ for FILE in *; do
     FILENAME="${DATE}.${EXT}"
     DEST_PATH="$DESTINATION_DIR/$FILENAME"
 
+    # If the timestamp collides with an existing file (e.g. burst shots,
+    # or cameras with 1-second date resolution), append -1, -2, ... until unique.
     if [ -e "$DEST_PATH" ]; then
-      echo "⚠️  File with name $FILENAME already exists."
-    else
-      mv "$FILE" "$DEST_PATH"
-      echo "✅ Moved: $FILENAME"
+      SUFFIX=1
+      while [ -e "$DESTINATION_DIR/${DATE}-${SUFFIX}.${EXT}" ]; do
+        SUFFIX=$((SUFFIX + 1))
+      done
+      FILENAME="${DATE}-${SUFFIX}.${EXT}"
+      DEST_PATH="$DESTINATION_DIR/$FILENAME"
     fi
+
+    mv "$FILE" "$DEST_PATH"
+    echo "✅ Moved: $FILENAME"
   else
     echo "❌ $FILE doesn't have EXIF or date metadata."
   fi
