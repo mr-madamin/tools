@@ -86,3 +86,32 @@ Lets one Color Control effect drive the fill of multiple shapes, so a single con
 ```js
 effect("Color Control")("Color")
 ```
+
+### Animate a Gradient Ramp's start/end points from another layer
+
+Ties a Gradient Ramp effect's Start/End of Ramp points to control layers' positions, so a lighting or reveal gradient follows moving objects instead of sitting static. Apply to Start of Ramp and End of Ramp separately.
+
+```js
+thisComp.layer("Ramp Start").transform.position
+```
+
+## Mask
+
+### Reference a mask path
+
+Reads a layer's own mask path so another expression can react to its shape — e.g. feeding it into `pointOnPath()` to scatter copies along a rotoscoped or hand-drawn mask instead of a procedural one.
+
+```js
+mask("Mask 1").maskPath
+```
+
+## Rotation
+
+### Auto-orient a layer to follow its motion path
+
+Points a moving layer in its direction of travel, computed from velocity — more predictable than AE's built-in Auto-Orient toggle, which can flip unexpectedly on some paths. Apply to the Rotation property.
+
+```js
+v = velocity;
+Math.atan2(v[1], v[0]) * 180 / Math.PI
+```
