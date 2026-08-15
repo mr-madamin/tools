@@ -58,6 +58,32 @@ if (effect("Checkbox Control")("Checkbox") == 1) {
 }
 ```
 
+### Switch between more than two states with a dropdown
+
+Cleaner than stacking multiple Checkbox Controls once there are 3+ options — add a Dropdown Menu Control, name its items, and switch on its numeric index.
+
+```js
+switch (effect("Direction")("Menu")) {
+  case 1: value + [100, 0]; break;
+  case 2: value + [-100, 0]; break;
+  case 3: value + [0, 100]; break;
+  default: value;
+}
+```
+
+### Trigger once when the playhead passes a marker
+
+Finds the latest comp marker at or before the current time and flips a value once the playhead reaches it — useful for one-shot reveals synced to an edit point rather than a hardcoded time.
+
+```js
+m = thisComp.marker;
+t = -1;
+for (i = 1; i <= m.numKeys; i++) {
+  if (m.key(i).time <= time) t = m.key(i).time;
+}
+t >= 0 ? 100 : 0
+```
+
 ## Text
 
 ### Drive text content from a Slider Control

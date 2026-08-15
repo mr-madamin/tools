@@ -138,3 +138,58 @@ Returns a random number (or array, for multi-dimensional properties) each frame.
 ```js
 random(0, 100)
 ```
+
+### Math.sin() / Math.cos() for smooth oscillation
+
+Drives a continuous back-and-forth wave without keyframes or `wiggle`'s randomness — good for breathing/pulsing/bobbing loops where you want a perfectly smooth, repeatable cycle.
+
+```js
+amp = 20;   // pixels of swing
+freq = 2;   // cycles per second
+value + amp * Math.sin(time * freq * Math.PI * 2)
+```
+
+### Vector math: length(), normalize(), dot(), cross()
+
+`length()` gives the distance between two points (or the magnitude of one vector) — useful for scale/opacity falloff based on proximity to a control layer. `normalize()`, `dot()`, and `cross()` are for direction math (e.g. angle between two layers, or building custom orientation logic).
+
+```js
+dist = length(thisComp.layer("Control").transform.position, transform.position);
+falloff = linear(dist, 0, 300, 100, 0); // closer to Control = bigger
+[falloff, falloff]
+```
+
+## Error handling
+
+### Guard against a missing layer or effect
+
+Wrapping a fragile reference in `try/catch` keeps the expression from turning red (and breaking the whole comp's render) when a referenced layer/effect is renamed, deleted, or just doesn't exist yet while you're building the rig.
+
+```js
+try {
+  thisComp.layer("Control").transform.position
+} catch (err) {
+  value
+}
+```
+
+## Physics
+
+### Spring / overshoot on existing keyframes
+
+The classic velocity-based spring: reads the velocity going into the nearest keyframe and lets it decay in a damped sine wave afterward, so a hand-keyed motion overshoots and settles instead of stopping dead. Apply to the same property that has the keyframes (Position, Scale, Rotation, etc.).
+
+```js
+freq = 3;    // oscillations per second
+decay = 5;   // how fast it settles
+n = 0;
+if (numKeys > 0) n = nearestKey(time).index;
+if (n > 0 && key(n).time > time) n--;
+if (n == 0) {
+  value;
+} else {
+  t = time - key(n).time;
+  v = velocityAtTime(key(n).time - thisComp.frameDuration / 10);
+  value + v * (freq == 0 ? 0 : 1/freq) * 0.15 * Math.sin(freq * t * 2 * Math.PI) / Math.exp(decay * t);
+}
+```

@@ -70,3 +70,36 @@ Returns whichever camera layer is currently active at the given time — useful 
 ```js
 thisComp.activeCamera
 ```
+
+## Layer state
+
+### Get a layer's actual bounding box
+
+`sourceRectAtTime()` returns `{top, left, width, height}` for a layer in its own space, recalculated at the given time — unlike a static value, it updates when the source changes size (e.g. a text layer whose content grows). Use it to auto-size a background box behind text or fit a shape to a source layer.
+
+```js
+r = thisComp.layer("Title").sourceRectAtTime();
+[r.width + 40, r.height + 40] // add padding; drive a rectangle's Size
+```
+
+### Skip logic on a hidden or disabled layer
+
+`layer.active` is true only when the layer's video switch is on, it's not shy/muted-out, and the playhead is inside its work area — a broader check than just visibility.
+
+```js
+if (thisComp.layer("Flash").active) {
+  value + 20
+} else {
+  value
+}
+```
+
+### Reacting to a layer's own trim (in/out points)
+
+`inPoint`/`outPoint` are the layer's trimmed start/end times in the comp, so a fade can be relative to where the clip actually starts and ends instead of the comp's timeline — handy when the same expression is copied onto layers with different trims.
+
+```js
+fadeIn = linear(time, inPoint, inPoint + 0.5, 0, 100);
+fadeOut = linear(time, outPoint - 0.5, outPoint, 100, 0);
+Math.min(fadeIn, fadeOut)
+```
