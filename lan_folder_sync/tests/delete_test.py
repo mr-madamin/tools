@@ -81,8 +81,43 @@ try:
     )
     print(f"OK path escape refused ({msg.get('message')!r}); {VICTIM} survived")
 
+    # absolute path is the other traversal vector — same guard must catch it
+    s = connect()
+    send_msg(s, json.dumps({"op": "DELETE", "path": "/etc/hosts"}).encode("utf-8"))
+    reply = recv_msg(s)
+    s.close()
+    assert reply is not None and json.loads(reply.decode("utf-8")).get("op") == "ERROR", (
+        "absolute-path DELETE was not refused"
+    )
+    print("OK absolute path also refused")
+
+    # --- Case 4: a legit nested-subdir delete works (guard must not over-block) ---
+    nested = os.path.join("sub", PROBE)
+    plant_on_peer(nested)  # creates received/sub/<probe>
+    assert nested in remote_manifest(), "setup failed: nested probe not on peer"
+    push("--delete")
+    assert nested not in remote_manifest(), f"{nested} survived --delete (guard too strict?)"
+    print(f"OK --delete removed nested {nested}")
+
+    # --- Case 5: deleting a missing file is idempotent (no ERROR, session lives) ---
+    s = connect()
+    gone = f"_never_existed_{os.getpid()}.txt"
+    send_msg(s, json.dumps({"op": "DELETE", "path": gone}).encode("utf-8"))
+    # server succeeds silently (no reply) — prove it by reusing the connection:
+    send_msg(s, json.dumps({"op": "MANIFEST"}).encode("utf-8"))
+    reply = recv_msg(s)
+    s.close()
+    assert reply is not None, "session died after deleting a missing file"
+    msg = json.loads(reply.decode("utf-8"))
+    assert msg.get("op") == "MANIFEST", f"expected MANIFEST, got {msg!r}"
+    print("OK deleting a missing file is idempotent; session survived")
+
     print("\nDELETE removes, previews safely, and refuses to escape received/. 🗑️")
 finally:
-    for p in (os.path.join(PEER_DIR, PROBE), VICTIM):
+    nested = os.path.join(PEER_DIR, "sub", PROBE)
+    for p in (os.path.join(PEER_DIR, PROBE), nested, VICTIM):
         if os.path.exists(p):
             os.remove(p)
+    sub = os.path.join(PEER_DIR, "sub")
+    if os.path.isdir(sub) and not os.listdir(sub):
+        os.rmdir(sub)
