@@ -1,6 +1,7 @@
-import socket
 import json
-from framing import send_msg, recv_msg
+import socket
+
+from framing import recv_msg, send_msg
 
 HOST, PORT = "127.0.0.1", 8765
 

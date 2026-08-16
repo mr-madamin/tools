@@ -1,5 +1,6 @@
-import socket
 import os
+import socket
+
 from framing import recv_file
 
 HOST, PORT = "", 8765

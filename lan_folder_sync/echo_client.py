@@ -1,6 +1,7 @@
 import socket
 import sys
-from framing import send_msg, recv_msg
+
+from framing import recv_msg, send_msg
 
 HOST = sys.argv[1] if len(sys.argv) > 1 else "127.0.0.1"
 PORT = 8765

@@ -1,5 +1,6 @@
 import socket
-from framing import send_msg, recv_msg
+
+from framing import recv_msg, send_msg
 
 HOST = ""
 PORT = 8765
