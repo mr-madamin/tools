@@ -27,7 +27,7 @@ def expect_error(label, payload: bytes):
 # --- Case 1: not JSON at all (malformed parse) ---
 expect_error("bad-json", b"not json at all")
 
-# --- Case 2: valid JSON, but no "op" (the KeyError you just fixed) ---
+# --- Case 2: valid JSON, but no "op" ---
 expect_error("missing-op", json.dumps({"foo": 1}).encode("utf-8"))
 
 # --- Case 3: well-formed frame, unknown op (a typo) ---
