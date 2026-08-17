@@ -6,7 +6,7 @@ import subprocess
 from framing import recv_msg, send_msg
 
 HOST, PORT = "127.0.0.1", 8765
-ROOT_DIR = "source"
+ROOT_DIR = "sandbox/source"
 PROBE = f"_dryrun_probe_{os.getpid()}.txt"  # unique so it can't pre-exist on peer
 
 

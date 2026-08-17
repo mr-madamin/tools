@@ -6,10 +6,12 @@ import subprocess
 from framing import recv_msg, send_msg
 
 HOST, PORT = "127.0.0.1", 8765
-ROOT_DIR = "source"
-PEER_DIR = "received"  # what the server serves — same machine, so we can plant files
+SANDBOX = "sandbox"
+ROOT_DIR = os.path.join(SANDBOX, "source")
+PEER_DIR = os.path.join(SANDBOX, "received")  # what the server serves; same machine, so we can plant files
 PROBE = f"_delete_probe_{os.getpid()}.txt"
 VICTIM = f"_delete_victim_{os.getpid()}.txt"
+VICTIM_PATH = os.path.join(SANDBOX, VICTIM)  # a sibling of received/, i.e. OUTSIDE it
 
 
 def connect():
@@ -67,7 +69,7 @@ try:
 
     # --- Case 3: a path escaping received/ is refused; the outside file survives ---
     # Hand-crafted frame: the honest client can never emit this path.
-    with open(VICTIM, "w") as f:  # sits in cwd = parent of received/
+    with open(VICTIM_PATH, "w") as f:  # in sandbox/, one level above received/
         f.write("must survive\n")
     s = connect()
     send_msg(s, json.dumps({"op": "DELETE", "path": f"../{VICTIM}"}).encode("utf-8"))
@@ -76,7 +78,7 @@ try:
     assert reply is not None, "server closed without sending an ERROR"
     msg = json.loads(reply.decode("utf-8"))
     assert msg.get("op") == "ERROR", f"expected ERROR, got {msg!r}"
-    assert os.path.exists(VICTIM), (
+    assert os.path.exists(VICTIM_PATH), (
         "path-escape DELETE removed a file OUTSIDE received/!"
     )
     print(f"OK path escape refused ({msg.get('message')!r}); {VICTIM} survived")
@@ -115,7 +117,7 @@ try:
     print("\nDELETE removes, previews safely, and refuses to escape received/. 🗑️")
 finally:
     nested = os.path.join(PEER_DIR, "sub", PROBE)
-    for p in (os.path.join(PEER_DIR, PROBE), nested, VICTIM):
+    for p in (os.path.join(PEER_DIR, PROBE), nested, VICTIM_PATH):
         if os.path.exists(p):
             os.remove(p)
     sub = os.path.join(PEER_DIR, "sub")

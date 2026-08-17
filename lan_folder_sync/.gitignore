@@ -1,5 +1,5 @@
-# runtime sync output — the "peer copy", regenerated every sync
-received/
+# runtime scratch — source (truth) + received (peer copy), regenerated every sync
+sandbox/
 
 # large throwaway test artifacts (300MB urandom files, etc.)
 *.bin
