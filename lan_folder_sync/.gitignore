@@ -1,0 +1,8 @@
+# runtime sync output — the "peer copy", regenerated every sync
+received/
+
+# large throwaway test artifacts (300MB urandom files, etc.)
+*.bin
+
+# local config carries the auth token — never commit the secret
+config.json
