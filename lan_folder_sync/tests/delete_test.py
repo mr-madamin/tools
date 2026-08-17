@@ -4,11 +4,14 @@ import socket
 import subprocess
 
 from framing import recv_msg, send_msg
+from tests._report import done, info, ok, section
 
 HOST, PORT = "127.0.0.1", 8765
 SANDBOX = "sandbox"
 ROOT_DIR = os.path.join(SANDBOX, "source")
-PEER_DIR = os.path.join(SANDBOX, "received")  # what the server serves; same machine, so we can plant files
+PEER_DIR = os.path.join(
+    SANDBOX, "received"
+)  # what the server serves; same machine, so we can plant files
 PROBE = f"_delete_probe_{os.getpid()}.txt"
 VICTIM = f"_delete_victim_{os.getpid()}.txt"
 VICTIM_PATH = os.path.join(SANDBOX, VICTIM)  # a sibling of received/, i.e. OUTSIDE it
@@ -38,7 +41,7 @@ def push(*extra_flags):
         text=True,
         check=False,
     )
-    print(result.stdout, end="")
+    info(result.stdout)
     assert result.returncode == 0, f"push crashed:\n{result.stderr}"
     return result
 
@@ -53,19 +56,23 @@ def plant_on_peer(name):
 
 
 try:
+    section("DELETE behaviour")
+
     # --- Case 1: --delete actually removes the file from the peer ---
     plant_on_peer(PROBE)
     assert PROBE in remote_manifest(), "setup failed: probe not on peer"
     push("--delete")
     assert PROBE not in remote_manifest(), f"{PROBE} still on peer after --delete"
-    print(f"OK --delete removed {PROBE} from the peer")
+    ok(f"--delete removed {PROBE} from the peer")
 
     # --- Case 2: --dry-run --delete PREVIEWS the delete but does NOT remove ---
     plant_on_peer(PROBE)
     result = push("--dry-run", "--delete")
     assert f"DELETE {PROBE}" in result.stdout, "dry-run did not list the delete"
     assert PROBE in remote_manifest(), f"{PROBE} was deleted during a DRY RUN!"
-    print(f"OK --dry-run --delete previewed but kept {PROBE}")
+    ok(f"--dry-run --delete previewed but kept {PROBE}")
+
+    section("Path safety")
 
     # --- Case 3: a path escaping received/ is refused; the outside file survives ---
     # Hand-crafted frame: the honest client can never emit this path.
@@ -81,25 +88,29 @@ try:
     assert os.path.exists(VICTIM_PATH), (
         "path-escape DELETE removed a file OUTSIDE received/!"
     )
-    print(f"OK path escape refused ({msg.get('message')!r}); {VICTIM} survived")
+    ok(f"path escape refused ({msg.get('message')!r}); {VICTIM} survived")
 
     # absolute path is the other traversal vector — same guard must catch it
     s = connect()
     send_msg(s, json.dumps({"op": "DELETE", "path": "/etc/hosts"}).encode("utf-8"))
     reply = recv_msg(s)
     s.close()
-    assert reply is not None and json.loads(reply.decode("utf-8")).get("op") == "ERROR", (
-        "absolute-path DELETE was not refused"
-    )
-    print("OK absolute path also refused")
+    assert (
+        reply is not None and json.loads(reply.decode("utf-8")).get("op") == "ERROR"
+    ), "absolute-path DELETE was not refused"
+    ok("absolute path also refused")
+
+    section("Guard doesn't over-block · idempotency")
 
     # --- Case 4: a legit nested-subdir delete works (guard must not over-block) ---
     nested = os.path.join("sub", PROBE)
     plant_on_peer(nested)  # creates received/sub/<probe>
     assert nested in remote_manifest(), "setup failed: nested probe not on peer"
     push("--delete")
-    assert nested not in remote_manifest(), f"{nested} survived --delete (guard too strict?)"
-    print(f"OK --delete removed nested {nested}")
+    assert nested not in remote_manifest(), (
+        f"{nested} survived --delete (guard too strict?)"
+    )
+    ok(f"--delete removed nested {nested}")
 
     # --- Case 5: deleting a missing file is idempotent (no ERROR, session lives) ---
     s = connect()
@@ -112,9 +123,9 @@ try:
     assert reply is not None, "session died after deleting a missing file"
     msg = json.loads(reply.decode("utf-8"))
     assert msg.get("op") == "MANIFEST", f"expected MANIFEST, got {msg!r}"
-    print("OK deleting a missing file is idempotent; session survived")
+    ok("deleting a missing file is idempotent; session survived")
 
-    print("\nDELETE removes, previews safely, and refuses to escape received/. 🗑️")
+    done("DELETE removes, previews safely, and refuses to escape received/ 🗑️")
 finally:
     nested = os.path.join(PEER_DIR, "sub", PROBE)
     for p in (os.path.join(PEER_DIR, PROBE), nested, VICTIM_PATH):

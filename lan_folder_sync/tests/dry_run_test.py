@@ -4,6 +4,7 @@ import socket
 import subprocess
 
 from framing import recv_msg, send_msg
+from tests._report import done, info, ok, section
 
 HOST, PORT = "127.0.0.1", 8765
 ROOT_DIR = "sandbox/source"
@@ -20,6 +21,8 @@ def remote_manifest():
     assert reply is not None, "server closed without sending a manifest"
     return json.loads(reply.decode("utf-8"))["files"]
 
+
+section("Dry-run")
 
 # 1. Plant a file locally that the peer definitely does not have
 os.makedirs(ROOT_DIR, exist_ok=True)
@@ -38,7 +41,7 @@ try:
         text=True,
         check=False,
     )
-    print(result.stdout, end="")
+    info(result.stdout)
     assert result.returncode == 0, f"push crashed:\n{result.stderr}"
 
     # 4. It should plan to send the probe...
@@ -50,6 +53,7 @@ try:
         f"{PROBE} reached the peer - dry-run transferred a file!"
     )
 
-    print(f"\nOK dry-run planned PUT {PROBE} but transferred nothing")
+    ok(f"dry-run planned PUT {PROBE} but transferred nothing")
+    done("dry-run previews without touching the peer")
 finally:
     os.remove(probe_path)

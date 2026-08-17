@@ -2,6 +2,7 @@ import json
 import socket
 
 from framing import recv_msg, send_msg
+from tests._report import done, ok, section
 
 HOST, PORT = "127.0.0.1", 8765
 
@@ -20,9 +21,11 @@ def expect_error(label, payload: bytes):
     assert reply is not None, f"{label}: server closed WITHOUT sending an ERROR"
     msg = json.loads(reply.decode("utf-8"))
     assert msg.get("op") == "ERROR", f"{label}: expected ERROR, got {msg!r}"
-    print(f"OK {label}: got ERROR -> {msg.get('message')!r}")
+    ok(f"{label}: got ERROR → {msg.get('message')!r}")
     s.close()
 
+
+section("Malformed-frame hardening")
 
 # --- Case 1: not JSON at all (malformed parse) ---
 expect_error("bad-json", b"not json at all")
@@ -45,7 +48,7 @@ reply = recv_msg(s)
 assert reply is not None, "server died — no reply after four bad frames"
 msg = json.loads(reply.decode("utf-8"))
 assert msg.get("op") == "MANIFEST", f"expected MANIFEST, got {msg!r}"
-print(f"OK survived: server still served a manifest ({len(msg['files'])} files)")
+ok(f"survived: server still served a manifest ({len(msg['files'])} files)")
 s.close()
 
-print("\nServer shrugged off every bad frame and kept serving. 🛡️")
+done("server shrugged off every bad frame and kept serving 🛡️")

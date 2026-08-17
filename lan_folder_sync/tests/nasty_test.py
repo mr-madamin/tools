@@ -2,8 +2,11 @@ import socket
 import struct
 
 from framing import recv_msg, send_msg
+from tests._report import done, ok, section
 
 HOST, PORT = "127.0.0.1", 8765
+
+section("Framing boundaries")
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((HOST, PORT))
@@ -14,7 +17,7 @@ big = b"A" * 1_000_000
 send_msg(sock, big)
 reply = recv_msg(sock)
 assert reply == big, f"MISMATCH: sent {len(big)}, got {len(reply) if reply else reply}"
-print(f"OK big payload: {len(big)} bytes survived the round trip intact")
+ok(f"big payload: {len(big)} bytes survived the round trip intact")
 
 # --- Test 2: two frames shoved into ONE sendall (coalesced on the wire) ---
 # Bypass send_msg on purpose so both frames land back-to-back in the
@@ -26,7 +29,7 @@ r1 = recv_msg(sock)
 r2 = recv_msg(sock)
 assert r1 == b"hello", f"frame 1 wrong: {r1!r}"
 assert r2 == b"bye", f"frame 2 wrong: {r2!r}"
-print(f"OK coalesced: split cleanly into {r1!r} then {r2!r}")
+ok(f"coalesced: split cleanly into {r1!r} then {r2!r}")
 
 sock.close()
-print("\nAll boundaries held. Framing works. 🎉")
+done("all boundaries held — framing works")
