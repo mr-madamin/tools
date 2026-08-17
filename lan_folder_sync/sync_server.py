@@ -4,7 +4,7 @@ import socket
 
 from framing import build_manifest, recv_file_body, recv_msg, send_error, send_msg
 
-SHARED_DIR = "received"
+SHARED_DIR = "sandbox/received"
 PORT = 8765
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

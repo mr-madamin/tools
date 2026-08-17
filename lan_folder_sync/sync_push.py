@@ -16,7 +16,7 @@ positional = [a for a in sys.argv[1:] if not a.startswith("--")]
 
 HOST = positional[0] if len(positional) > 0 else "127.0.0.1"
 PORT = 8765
-ROOT_DIR = positional[1] if len(positional) > 1 else "source"
+ROOT_DIR = positional[1] if len(positional) > 1 else "sandbox/source"
 
 dry_run = "--dry-run" in flags
 delete = "--delete" in flags

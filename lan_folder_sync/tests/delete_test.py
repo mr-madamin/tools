@@ -45,8 +45,8 @@ def push(*extra_flags):
 
 def plant_on_peer(name):
     """Simulate a file the peer HAS but the source does NOT (a delete candidate)."""
-    os.makedirs(PEER_DIR, exist_ok=True)
     path = os.path.join(PEER_DIR, name)
+    os.makedirs(os.path.dirname(path), exist_ok=True)  # handles nested names like sub/x
     with open(path, "w") as f:
         f.write("delete me\n")
     return path
