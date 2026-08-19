@@ -2,10 +2,14 @@ import json
 import os
 import socket
 
+from config import load_config
 from framing import build_manifest, recv_file_body, recv_msg, send_error, send_msg
 
 SHARED_DIR = "sandbox/received"
 PORT = 8765
+
+cfg = load_config()
+TOKEN = cfg["token"]
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -16,6 +20,7 @@ print(f"Serving {SHARED_DIR}/ on {PORT} ... (Ctrl-C to stop)")
 while True:
     conn, addr = sock.accept()
     print(f"Connected from {addr[0]}:{addr[1]}")
+    authenticated = False
     try:
         while True:
             header_bytes = recv_msg(conn)
@@ -29,6 +34,19 @@ while True:
                 break
 
             op = header.get("op")
+
+            if not authenticated:
+                if op != "HELLO":
+                    send_error(conn, "auth required: send HELLO first")
+                    break
+                if header.get("token") != TOKEN:
+                    send_error(conn, "bad token")
+                    break
+                authenticated = True
+                send_msg(conn, json.dumps({"op": "OK"}).encode("utf-8"))
+                print("     HELLO ok, session authenticated")
+                continue
+
             if op == "MANIFEST":
                 manifest = build_manifest(SHARED_DIR)
                 reply = json.dumps({"op": "MANIFEST", "files": manifest}).encode(
