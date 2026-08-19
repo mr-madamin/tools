@@ -2,6 +2,7 @@ import json
 import socket
 import sys
 
+from config import load_config
 from framing import (
     build_manifest,
     diff_manifests,
@@ -14,6 +15,9 @@ from framing import (
 flags = {a for a in sys.argv[1:] if a.startswith("--")}
 positional = [a for a in sys.argv[1:] if not a.startswith("--")]
 
+cfg = load_config()
+TOKEN = cfg["token"]
+
 HOST = positional[0] if len(positional) > 0 else "127.0.0.1"
 PORT = 8765
 ROOT_DIR = positional[1] if len(positional) > 1 else "sandbox/source"
@@ -23,6 +27,14 @@ delete = "--delete" in flags
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((HOST, PORT))
+
+send_msg(sock, json.dumps({"op": "HELLO", "token": TOKEN}).encode("utf-8"))
+reply = recv_msg(sock)
+if reply is None:
+    sys.exit("peer closed during handshake (wrong token?)")
+msg = json.loads(reply.decode("utf-8"))
+if msg.get("op") != "OK":
+    sys.exit(f"handshake refused: {msg.get('message')}")
 
 local = build_manifest(ROOT_DIR)
 
