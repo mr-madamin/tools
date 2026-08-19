@@ -6,7 +6,7 @@ Works both as `python3 -m tests.<name>` and under pytest:
 
     from tests._report import section, ok, info, done
 
-Colour is emitted only when stdout is a TTY, so piped/captured logs stay clean
+Color is emitted only when stdout is a TTY, so piped/captured logs stay clean
 (the ✅ still shows — it's just text).
 """
 
@@ -43,3 +43,15 @@ def info(msg):
 def done(title="all checks passed"):
     """Final tally banner."""
     print(_c("1;32", f"\n🎉 {_passed} checks — {title}\n"))
+
+
+def fail(msg):
+    print(_c("1;31", f"\n❌ FAILED after {_passed} passing check(s) — {msg}\n"))
+
+
+def _excepthook(exc_type, exc, tb):
+    sys.__excepthook__(exc_type, exc, tb)  # traceback first, for debugging
+    fail(f"{exc_type.__name__}: {exc}")  # ...then the red verdict, last
+
+
+sys.excepthook = _excepthook
