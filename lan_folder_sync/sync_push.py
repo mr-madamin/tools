@@ -6,6 +6,7 @@ from config import load_config
 from framing import (
     build_manifest,
     diff_manifests,
+    handshake,
     recv_msg,
     send_delete,
     send_file,
@@ -28,13 +29,11 @@ delete = "--delete" in flags
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((HOST, PORT))
 
-send_msg(sock, json.dumps({"op": "HELLO", "token": TOKEN}).encode("utf-8"))
-reply = recv_msg(sock)
+reply = handshake(sock, TOKEN)
 if reply is None:
     sys.exit("peer closed during handshake (wrong token?)")
-msg = json.loads(reply.decode("utf-8"))
-if msg.get("op") != "OK":
-    sys.exit(f"handshake refused: {msg.get('message')}")
+if reply.get("op") != "OK":
+    sys.exit(f"handshake refused: {reply.get('message')}")
 
 local = build_manifest(ROOT_DIR)
 
