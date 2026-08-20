@@ -126,3 +126,14 @@ def send_delete(conn, rel_path):
     """Ask the peer to remove one file (no body)."""
     msg = json.dumps({"op": "DELETE", "path": rel_path}).encode("utf-8")
     send_msg(conn, msg)
+
+
+def handshake(conn, token):
+    """Client side of HELLO: send the token, return the server's reply dict
+    (e.g. {"op": "OK"} or {"op": "ERROR", ...}), or None if the peer closed.
+    Caller decides what to do with a non-OK reply"""
+    send_msg(conn, json.dumps({"op": "HELLO", "token": token}).encode("utf-8"))
+    reply = recv_msg(conn)
+    if reply is None:
+        return None
+    return json.loads(reply.decode("utf-8"))
