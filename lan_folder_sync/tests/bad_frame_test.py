@@ -1,15 +1,19 @@
 import json
 import socket
 
-from framing import recv_msg, send_msg
+from config import load_config
+from framing import handshake, recv_msg, send_msg
 from tests._report import done, ok, section
 
 HOST, PORT = "127.0.0.1", 8765
+TOKEN = load_config()["token"]
 
 
 def connect():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((HOST, PORT))
+    reply = handshake(s, TOKEN)
+    assert reply is not None and reply.get("op") == "OK", f"handshake failed: {reply!r}"
     return s
 
 
