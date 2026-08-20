@@ -28,7 +28,6 @@ def connect():
 
 
 def remote_manifest():
-    """Ask the live server what files its received/ holds — our oracle."""
     s = connect()
     send_msg(s, json.dumps({"op": "MANIFEST"}).encode("utf-8"))
     reply = recv_msg(s)
@@ -38,7 +37,7 @@ def remote_manifest():
 
 
 def push(*extra_flags):
-    """Run the REAL sync_push.py with extra flags; return its CompletedProcess."""
+    """Run the REAL sync_push.py with extra flags; return its completed process."""
     result = subprocess.run(
         ["python3", "sync_push.py", HOST, ROOT_DIR, *extra_flags],
         capture_output=True,
@@ -51,16 +50,16 @@ def push(*extra_flags):
 
 
 def plant_on_peer(name):
-    """Simulate a file the peer HAS but the source does NOT (a delete candidate)."""
+    """Simulate a file the peer has but the source does not (a delete candidate)"""
     path = os.path.join(PEER_DIR, name)
-    os.makedirs(os.path.dirname(path), exist_ok=True)  # handles nested names like sub/x
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write("delete me\n")
     return path
 
 
 try:
-    section("DELETE behaviour")
+    section("DELETE behavior")
 
     # --- Case 1: --delete actually removes the file from the peer ---
     plant_on_peer(PROBE)
@@ -69,7 +68,7 @@ try:
     assert PROBE not in remote_manifest(), f"{PROBE} still on peer after --delete"
     ok(f"--delete removed {PROBE} from the peer")
 
-    # --- Case 2: --dry-run --delete PREVIEWS the delete but does NOT remove ---
+    # --- Case 2: --dry-run --delete previews the delete but does not remove ---
     plant_on_peer(PROBE)
     result = push("--dry-run", "--delete")
     assert f"DELETE {PROBE}" in result.stdout, "dry-run did not list the delete"
@@ -90,7 +89,7 @@ try:
     msg = json.loads(reply.decode("utf-8"))
     assert msg.get("op") == "ERROR", f"expected ERROR, got {msg!r}"
     assert os.path.exists(VICTIM_PATH), (
-        "path-escape DELETE removed a file OUTSIDE received/!"
+        "path-escape DELETE removed a file outside received/!"
     )
     ok(f"path escape refused ({msg.get('message')!r}); {VICTIM} survived")
 
