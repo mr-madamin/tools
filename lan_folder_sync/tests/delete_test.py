@@ -3,10 +3,12 @@ import os
 import socket
 import subprocess
 
-from framing import recv_msg, send_msg
+from config import load_config
+from framing import handshake, recv_msg, send_msg
 from tests._report import done, info, ok, section
 
 HOST, PORT = "127.0.0.1", 8765
+TOKEN = load_config()["token"]
 SANDBOX = "sandbox"
 ROOT_DIR = os.path.join(SANDBOX, "source")
 PEER_DIR = os.path.join(
@@ -20,6 +22,8 @@ VICTIM_PATH = os.path.join(SANDBOX, VICTIM)  # a sibling of received/, i.e. OUTS
 def connect():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((HOST, PORT))
+    reply = handshake(s, TOKEN)
+    assert reply is not None and reply.get("op") == "OK", f"handshake failed: {reply!r}"
     return s
 
 
