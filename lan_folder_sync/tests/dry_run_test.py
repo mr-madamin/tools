@@ -3,10 +3,12 @@ import os
 import socket
 import subprocess
 
-from framing import recv_msg, send_msg
+from config import load_config
+from framing import handshake, recv_msg, send_msg
 from tests._report import done, info, ok, section
 
 HOST, PORT = "127.0.0.1", 8765
+TOKEN = load_config()["token"]
 ROOT_DIR = "sandbox/source"
 PROBE = f"_dryrun_probe_{os.getpid()}.txt"  # unique so it can't pre-exist on peer
 
@@ -15,6 +17,8 @@ def remote_manifest():
     """Ask the live server what files its received"""
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((HOST, PORT))
+    reply = handshake(s, TOKEN)
+    assert reply is not None and reply.get("op") == "OK", f"handshake failed: {reply!r}"
     send_msg(s, json.dumps({"op": "MANIFEST"}).encode("utf-8"))
     reply = recv_msg(s)
     s.close()
