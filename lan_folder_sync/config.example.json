@@ -1,5 +1,5 @@
 {
-  "shared_dir": "sandbox/received",
-  "peer": { "host": "127.0.0.1", "port": 8765 },
-  "token": "replace-with-a-token"
+  "shared_dir": "/Users/you/SyncMe",
+  "peer": { "host": "192.168.1.42", "port": 8765 },
+  "token": "REPLACE-with-a-long-random-string-same-on-both-machines"
 }
