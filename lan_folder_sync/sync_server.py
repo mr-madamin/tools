@@ -40,7 +40,7 @@ if "--lan" in flags:
     BIND_HOST = lan_ip()
     if not BIND_HOST:
         sys.exit(
-            "--lan: no en0 IPv4 found (offline, or Wi-Fi isn't en0)"
+            "--lan: no en0 IPv4 found (offline, or Wi-Fi isn't en0). "
             "Join the LAN, or drop --lan to bind 127.0.0.1"
         )
 else:
