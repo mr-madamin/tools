@@ -1,21 +1,25 @@
 import json
 import os
 import socket
+import sys
 
 from config import load_config
 from framing import build_manifest, recv_file_body, recv_msg, send_error, send_msg
 
-SHARED_DIR = "sandbox/received"
-PORT = 8765
-
 cfg = load_config()
 TOKEN = cfg["token"]
 
+SHARED_DIR = (
+    sys.argv[1] if len(sys.argv) > 1 else cfg.get("shared_dir", "sandbox/received")
+)
+PORT = int(sys.argv[2] if len(sys.argv) > 2 else cfg.get("peer", {}).get("port", 8765))
+BIND_HOST = "127.0.0.1"
+
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-sock.bind(("127.0.0.1", PORT))
+sock.bind((BIND_HOST, PORT))
 sock.listen(1)
-print(f"Serving {SHARED_DIR}/ on {PORT} ... (Ctrl-C to stop)")
+print(f"Serving {SHARED_DIR}/ on {BIND_HOST}:{PORT} ... (Ctrl-C to stop)")
 
 while True:
     conn, addr = sock.accept()

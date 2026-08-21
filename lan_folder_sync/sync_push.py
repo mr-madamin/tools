@@ -19,9 +19,13 @@ positional = [a for a in sys.argv[1:] if not a.startswith("--")]
 cfg = load_config()
 TOKEN = cfg["token"]
 
-HOST = positional[0] if len(positional) > 0 else "127.0.0.1"
-PORT = 8765
-ROOT_DIR = positional[1] if len(positional) > 1 else "sandbox/source"
+peer = cfg.get("peer", {})
+
+HOST = positional[0] if len(positional) > 0 else peer.get("host", "127.0.0.1")
+PORT = peer.get("port", 8765)
+ROOT_DIR = (
+    positional[1] if len(positional) > 1 else cfg.get("shared_dir", "sandbox/source")
+)
 
 dry_run = "--dry-run" in flags
 delete = "--delete" in flags
