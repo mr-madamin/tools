@@ -99,9 +99,3 @@ terminal:
 python3 sync_server.py                 # loopback, in one terminal
 python3 -m tests.hello_test            # in another  (NOT python3 tests/hello_test.py)
 ```
-
-## 7. Note on the commands
-
-Today the two roles are separate scripts — `sync_server.py` (serve) and
-`sync_push.py` (push). A single `sync.py serve | push` entry point is a planned
-consolidation, not yet built.
