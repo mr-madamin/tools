@@ -25,10 +25,14 @@ def lan_ip():
     """This Mac's en0 IPv4 (Wi-Fi, usually), or '' if offline / not on en0"""
     try:
         out = subprocess.run(
-            ["ipconfig", "getifaddr", "en0"], capture_output=True, text=True, timeout=2
+            ["ipconfig", "getifaddr", "en0"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            check=False,
         )
         return out.stdout.strip()
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return ""
 
 
