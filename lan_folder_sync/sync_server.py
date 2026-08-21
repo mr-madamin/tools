@@ -1,6 +1,7 @@
 import json
 import os
 import socket
+import subprocess
 import sys
 
 from config import load_config
@@ -9,17 +10,45 @@ from framing import build_manifest, recv_file_body, recv_msg, send_error, send_m
 cfg = load_config()
 TOKEN = cfg["token"]
 
+flags = {a for a in sys.argv[1:] if a.startswith("--")}
+positional = [a for a in sys.argv[1:] if not a.startswith("--")]
+
 SHARED_DIR = (
-    sys.argv[1] if len(sys.argv) > 1 else cfg.get("shared_dir", "sandbox/received")
+    positional[0] if len(positional) > 0 else cfg.get("shared_dir", "sandbox/received")
 )
-PORT = int(sys.argv[2] if len(sys.argv) > 2 else cfg.get("peer", {}).get("port", 8765))
-BIND_HOST = "127.0.0.1"
+PORT = int(
+    positional[1] if len(positional) > 1 else cfg.get("peer", {}).get("port", 8765)
+)
+
+
+def lan_ip():
+    """This Mac's en0 IPv4 (Wi-Fi, usually), or '' if offline / not on en0"""
+    try:
+        out = subprocess.run(
+            ["ipconfig", "getifaddr", "en0"], capture_output=True, text=True, timeout=2
+        )
+        return out.stdout.strip()
+    except Exception:
+        return ""
+
+
+if "--lan" in flags:
+    BIND_HOST = lan_ip()
+    if not BIND_HOST:
+        sys.exit(
+            "--lan: no en0 IPv4 found (offline, or Wi-Fi isn't en0)"
+            "Join the LAN, or drop --lan to bind 127.0.0.1"
+        )
+else:
+    BIND_HOST = "127.0.0.1"
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind((BIND_HOST, PORT))
 sock.listen(1)
 print(f"Serving {SHARED_DIR}/ on {BIND_HOST}:{PORT} ... (Ctrl-C to stop)")
+if BIND_HOST != "127.0.0.1":
+    print(f"  → peers: set config.json peer.host to {BIND_HOST!r}")
 
 while True:
     conn, addr = sock.accept()
