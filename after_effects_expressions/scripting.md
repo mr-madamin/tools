@@ -70,3 +70,45 @@ Load a PNG into an `Image{}` control (or any control's `.image`) via a `File` â€
 ```js
 group.logo.image = File('~/assets/logo.png');
 ```
+
+## Guarding & selection
+
+### Require a composition to be active
+
+Most operations need a comp. `app.project.activeItem` is whatever's focused in the Project/Timeline; check it's actually a `CompItem` before touching layers, and bail with an `alert` otherwise.
+
+```js
+function isCompSelected() {
+  return app.project.activeItem instanceof CompItem;
+}
+
+if (!isCompSelected()) {
+  return alert('You have to select a composition.');
+}
+```
+
+### Get the time range of the selected layers
+
+Walk `comp.selectedLayers` and collapse their in/out points into a single start/end span â€” useful for sizing an adjustment or effect layer to cover exactly what the user selected.
+
+```js
+function getSelectedLayersDuration() {
+  var comp = app.project.activeItem;
+  var startTime = null, endTime = null;
+
+  if (comp.selectedLayers.length === 0) {
+    return alert('You have to select at least one layer');
+  }
+  for (var i = 0; i < comp.selectedLayers.length; i++) {
+    var layer = comp.selectedLayers[i];
+    if (startTime === null) {
+      startTime = layer.inPoint;
+      endTime = layer.outPoint;
+    } else {
+      if (layer.inPoint < startTime) startTime = layer.inPoint;
+      if (layer.outPoint > endTime) endTime = layer.outPoint;
+    }
+  }
+  return { start: startTime, end: endTime };
+}
+```
