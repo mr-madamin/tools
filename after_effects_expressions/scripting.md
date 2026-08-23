@@ -124,3 +124,45 @@ app.beginUndoGroup('Add Watermark');
 // ...import, add layers, set keyframes...
 app.endUndoGroup();
 ```
+
+## Importing & adding layers
+
+### Import a file and add it to the comp
+
+`importFile` brings a footage item into the Project; `comp.layers.add()` places it on the active comp. Check `File.exists` first so a missing asset fails loudly instead of throwing.
+
+```js
+var video = new File('~/assets/intro.mov');
+if (!video.exists) return alert('Failed to find video file');
+
+var opts = new ImportOptions();
+opts.file = video;
+opts.video = true;                       // or set .sequence / .forceAlphabetical
+var item = app.project.importFile(opts);
+
+var layer = comp.layers.add(item);
+layer.name = 'intro_video';
+layer.startTime = 1;                     // shift when the footage begins
+```
+
+`new ImportOptions(file)` is a shorthand when you don't need to set flags.
+
+### Stack layers in a specific order
+
+New layers land at the top. `moveAfter` / `moveBefore` reorder relative to another layer — e.g. put a vignette solid just under the first selected layer.
+
+```js
+logoLayer.moveAfter(videoLayer);
+solid.moveBefore(comp.selectedLayers[0]);
+```
+
+### Add a solid, adjustment layer, or vignette
+
+`layers.addSolid([r,g,b], name, w, h, pixelAspect, duration)` creates a color solid. Set `adjustmentLayer = true` to turn it into an adjustment layer so its effects apply to everything beneath it.
+
+```js
+var solid = comp.layers.addSolid([0, 0, 0], 'color_correction', 3840, 2160, 1, 10);
+solid.adjustmentLayer = true;
+solid.inPoint = duration.start;
+solid.outPoint = duration.end;
+```
