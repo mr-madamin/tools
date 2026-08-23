@@ -210,3 +210,43 @@ comp.markerProperty.setValueAtTime(11, marker);
 
 comp.duration = comp.duration + 11;   // extend the comp to make room
 ```
+
+## Effects
+
+### Add and configure an effect
+
+`layer.Effects.addProperty(matchName)` applies an effect; the returned object lets you set its parameters by name. Match names come from AE's effect list (e.g. `ADBE CurvesCustom`, `ADBE HUE SATURATION`).
+
+```js
+solid.Effects.addProperty('ADBE CurvesCustom');
+var hue = solid.Effects.addProperty('ADBE HUE SATURATION');
+hue.property('Master Saturation').setValue(30);
+```
+
+## Masks
+
+### Build a mask shape from scratch
+
+Add a mask with `layer.Masks.addProperty("ADBE Mask Atom")`, then read the current `Shape` value, mutate its `vertices` / tangent arrays, and write it back. The `0.5523` "magic number" (kappa) approximates a circle with Bézier tangents — used here for a soft elliptical vignette in SUBTRACT mode.
+
+```js
+var mask = solid.Masks.addProperty("ADBE Mask Atom");
+mask.maskMode = MaskMode.SUBTRACT;
+mask.name = 'Vignette';
+mask.feather = [500, 500];
+
+var maskProperty = mask.property("ADBE Mask Shape");
+var shape = maskProperty.value;
+
+var ratio = 0.5523;
+var h = solid.width / 2, v = solid.height / 2;
+var th = h * ratio, tv = v * ratio;
+
+shape.vertices    = [[h, 0], [0, v], [h, 2 * v], [2 * h, v]];
+shape.inTangents  = [[th, 0], [0, -tv], [-th, 0], [0, tv]];
+shape.outTangents = [[-th, 0], [0, tv], [th, 0], [0, -tv]];
+shape.closed = true;
+
+maskProperty.setValue(shape);
+mask.property("Mask Feather").setValue([600, 600]);
+```
