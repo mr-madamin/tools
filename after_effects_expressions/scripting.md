@@ -112,3 +112,15 @@ function getSelectedLayersDuration() {
   return { start: startTime, end: endTime };
 }
 ```
+
+## Undo
+
+### Group everything into one undo step
+
+Wrap each action between `beginUndoGroup` / `endUndoGroup` so the whole operation collapses to a single Cmd/Ctrl+Z, instead of the user having to undo each layer, keyframe, and effect separately.
+
+```js
+app.beginUndoGroup('Add Watermark');
+// ...import, add layers, set keyframes...
+app.endUndoGroup();
+```
