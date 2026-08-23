@@ -197,3 +197,16 @@ var t = layer.property('ADBE Transform Group');
 t.property('ADBE Scale').setValue([80, 80]);
 t.property('ADBE Position').setValue([3500, 210]);
 ```
+
+## Markers
+
+### Add a comp marker
+
+`MarkerValue` plus `comp.markerProperty.setValueAtTime` drops a named marker on the comp's timeline — handy as a "Start" cue that expressions or editors can sync to.
+
+```js
+var marker = new MarkerValue('Start');
+comp.markerProperty.setValueAtTime(11, marker);
+
+comp.duration = comp.duration + 11;   // extend the comp to make room
+```
