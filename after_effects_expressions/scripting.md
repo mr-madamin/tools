@@ -166,3 +166,34 @@ solid.adjustmentLayer = true;
 solid.inPoint = duration.start;
 solid.outPoint = duration.end;
 ```
+
+## Keyframes
+
+### Set keyframed values on a property
+
+Address a property by its match name (e.g. `ADBE Transform Group` → `ADBE Opacity`) and call `setValueAtTime(time, value)` to create a keyframe. Two keyframes at different times make an animation — here a 3-second fade-in on opacity and audio together.
+
+```js
+var start = layer.inPoint;
+var end = layer.inPoint + 3;
+
+var opacity = layer.property('ADBE Transform Group').property('ADBE Opacity');
+opacity.setValueAtTime(start, 0);
+opacity.setValueAtTime(end, 100);
+
+var audio = layer.property('ADBE Audio Group').property('ADBE Audio Levels');
+audio.setValueAtTime(start, [-48, -48]);   // dB, stereo
+audio.setValueAtTime(end, [0, 0]);
+```
+
+`addKey(time)` sets a keyframe at the property's current value without changing it — useful as the "hold" anchor before an animated change.
+
+### Scale and position are 2-value arrays
+
+Transform properties like Scale and Position take `[x, y]` (or `[x, y, z]` in 3D). Scale is a percentage.
+
+```js
+var t = layer.property('ADBE Transform Group');
+t.property('ADBE Scale').setValue([80, 80]);
+t.property('ADBE Position').setValue([3500, 210]);
+```
