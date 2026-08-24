@@ -223,6 +223,49 @@ var hue = solid.Effects.addProperty('ADBE HUE SATURATION');
 hue.property('Master Saturation').setValue(30);
 ```
 
+### Effect match name reference
+
+Match names are stable across AE versions and languages (unlike the display names), so scripts should always address effects by them. A selection useful for branded / loop content:
+
+| Match name | Effect | Good for |
+| --- | --- | --- |
+| `ADBE Pro Levels2` | Levels | Black/white point, gamma |
+| `ADBE CurvesCustom` | Curves | Precise tonal grade |
+| `ADBE Lumetri` | Lumetri Color | Full grade, LUTs, white balance |
+| `ADBE Brightness & Contrast 2` | Brightness & Contrast | Quick contrast |
+| `ADBE HUE SATURATION` | Hue/Saturation | Saturation / hue shift |
+| `ADBE Tint` | Tint | Map blacks/whites to two colors |
+| `ADBE Vibrance` | Vibrance | Gentle saturation |
+| `ADBE Glo2` | Glow | Bloom on logos / titles |
+| `ADBE Fill` | Fill | Recolor a logo or matte |
+| `ADBE Ramp` | Gradient Ramp | Light leaks, scrims |
+| `ADBE Fractal Noise` | Fractal Noise | Grain, fog, texture |
+| `ADBE Roughen Edges` | Roughen Edges | Grungy / torn edges |
+| `ADBE Drop Shadow` | Drop Shadow | Watermark / text legibility |
+| `ADBE Bevel Alpha` | Bevel Alpha | Soft edge shading |
+| `ADBE Gaussian Blur 2` | Gaussian Blur | Blur a plate behind text |
+| `ADBE Box Blur2` | Fast Box Blur | Cheaper blur, iterable |
+| `ADBE Transform` | Transform | Extra anchor/scale/skew |
+| `ADBE Corner Pin` | Corner Pin | Screen replacements |
+| `ADBE Set Matte3` | Set Matte | Borrow another layer's alpha |
+| `ADBE Numbers2` | Numbers | Procedural counters / timecode |
+
+### Discover a match name (and its properties)
+
+Match names aren't shown in AE's UI. Apply the effect once by hand, select the layer, and dump its effect stack — this also prints each effect's internal property names, which you need for `.property(...).setValue(...)`.
+
+```js
+var fx = app.project.activeItem.selectedLayers[0].property("ADBE Effect Parade");
+for (var i = 1; i <= fx.numProperties; i++) {
+  var e = fx.property(i);
+  var line = e.name + "  ->  " + e.matchName + "\n";
+  for (var j = 1; j <= e.numProperties; j++) {
+    line += "    " + e.property(j).name + "  ->  " + e.property(j).matchName + "\n";
+  }
+  alert(line);
+}
+```
+
 ## Masks
 
 ### Build a mask shape from scratch
