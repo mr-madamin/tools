@@ -24,6 +24,42 @@ n = Math.floor(full.length * t / 100);
 full.substr(0, n)
 ```
 
+### Typewriter with a blinking cursor
+
+Extends the typewriter reveal with a trailing `|` that blinks. Two effect controls drive it: a **Slider** ("Text") giving the number of visible characters, and a **Checkbox** ("On/Off") to toggle the cursor. The cursor stays solid while characters are still being revealed (detected by comparing the slider's value one frame ahead against now), then blinks on a fixed frame interval once typing stops. Apply to Source Text.
+
+```js
+var sign = '|';
+var blinkInterval = 25;                       // frames per on/off half-cycle
+var i = effect('Text')('ADBE Slider Control-0001');
+var on = effect('On/Off')('ADBE Checkbox Control-0001');
+
+var check = timeToFrames(time) / blinkInterval;
+var end;
+
+if (on == 1) {
+  if (i.valueAtTime(time + thisComp.frameDuration) > i) {
+    end = sign;                               // still typing -> solid cursor
+  } else {
+    end = (Math.floor(check) % 2 === 0) ? sign : ' ';   // done -> blink
+  }
+} else {
+  end = ' ';
+}
+
+text.sourceText.substr(0, parseInt(i)) + end;
+```
+
+To couple a text **animator's** Range Selector to the same character count (so effects like a per-character glow track the revealed text), drive its Start/End from the source text instead of a second slider:
+
+```js
+// Animator range Start
+text.animator("ADBE Text Animator")("ADBE Text Selectors")("ADBE Text Selector")("ADBE Text Index End") - 1
+
+// Animator range End
+text("ADBE Text Document").length
+```
+
 ### Counting number display
 
 Formats a driving value as text with thousands separators — extends the plain `Math.round().toString()` pattern for score counters, stat reveals, or currency displays.
