@@ -26,6 +26,19 @@ avg = sum / n;
 100 + avg * 0.5
 ```
 
+`smooth()` does the same averaging in one line when the property carrying the expression is the noisy one itself, but the manual loop above is what you need when you're smoothing a value read off *another* layer.
+
+### Per-layer band offset for a spectrum
+
+Reading the amplitude at slightly different times per layer turns one audio track into a row of bars that ripple rather than pulse in unison — cheaper than a real FFT and usually reads better.
+
+```js
+amp = thisComp.layer("Audio Amplitude").effect("Both Channels")("Slider");
+offset = (index - 1) * 0.03; // seconds of lag per bar
+h = amp.valueAtTime(time - offset) * 8;
+[value[0], Math.max(2, h)]
+```
+
 ### Threshold trigger from audio
 
 Fires a behavior only once amplitude crosses a threshold — e.g. flashing a layer on a beat instead of continuously scaling with volume.
