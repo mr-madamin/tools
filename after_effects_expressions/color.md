@@ -90,3 +90,14 @@ src.sampleImage(p, [8, 8], true, time)
 `postEffect = true` samples after the layer's effects and masks; `false` samples the raw source. The radius is a half-width/half-height in pixels, so `[8, 8]` averages a 16×16 patch — larger radii are steadier but slower.
 
 `sampleImage` is one of the most expensive calls in the expression language. Call it once per expression, never inside a loop, and consider pairing it with `posterizeTime()` when the sampled area changes slowly.
+
+### Contrast-aware text color
+
+Converts a sampled background to perceived brightness and flips the text between black and white, so a caption stays readable over changing footage without anyone hand-keying it.
+
+```js
+src = thisComp.layer("Backdrop");
+c = src.sampleImage(src.fromComp(toComp(anchorPoint)), [20, 20], true, time);
+lum = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+lum > 0.5 ? [0, 0, 0, 1] : [1, 1, 1, 1]
+```
