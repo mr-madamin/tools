@@ -35,6 +35,15 @@ thisComp.layer("Ball").transform.position.valueAtTime(time - 10/frameRate)
 smooth(0.3, 10)
 ```
 
+### Reading a property's velocity and speed
+
+`velocityAtTime(t)` returns the rate of change as a vector (per dimension), `speedAtTime(t)` as a single magnitude. Both are how you drive one property off another's motion — motion blur amount, squash-and-stretch, or a trail that only shows up while something is moving.
+
+```js
+sp = thisComp.layer("Ball").transform.position.speedAtTime(time);
+linear(sp, 0, 800, 0, 100) // faster = more opaque
+```
+
 ## Repeat
 
 ### Repeating animations without keyframes
