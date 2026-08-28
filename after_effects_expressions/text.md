@@ -101,3 +101,47 @@ words = text.sourceText.split(" ");
 words[0] = words[0].toUpperCase();
 words.join(" ")
 ```
+
+## Styling
+
+Text style expressions (After Effects 2022 and later) let a Source Text expression change how the text looks, not just what it says. The chain starts from `text.sourceText.style` and every setter returns the style, so calls can be chained.
+
+### Drive font size and color from controls
+
+Puts type styling under the same slider/color controls as the rest of a rig, instead of buried in the Character panel — so a template's look can be changed without selecting the text.
+
+```js
+c = effect("Tint")("Color");
+text.sourceText.style
+  .setFontSize(effect("Size")("Slider"))
+  .setFillColor([c[0], c[1], c[2]])
+```
+
+`setFillColor` takes a three-element array, so the alpha channel from a Color Control has to be dropped.
+
+### Other style setters
+
+```js
+text.sourceText.style
+  .setFont("Helvetica-Bold")
+  .setTracking(80)
+  .setLeading(72)
+  .setApplyStroke(true)
+  .setStrokeColor([1, 1, 1])
+  .setStrokeWidth(2)
+```
+
+Read the current values back with the matching getters — `style.fontSize`, `style.font`, `style.tracking`, and so on — which is how you modify a style relative to whatever the Character panel is set to rather than hardcoding it.
+
+```js
+text.sourceText.style.setFontSize(style.fontSize * 1.5)
+```
+
+### Style a range of characters
+
+Passing a start index and character count applies a setter to only part of the string — for highlighting a word without splitting it onto its own layer.
+
+```js
+s = "Total: 1,240";
+text.sourceText.style.setText(s).setFillColor([1, 0.42, 0.21], 7, 5)
+```
