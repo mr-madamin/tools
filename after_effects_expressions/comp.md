@@ -61,6 +61,69 @@ Comp markers are handy for triggering behavior at specific points in time, e.g. 
 thisComp.marker.key(1).time
 ```
 
+### Layer markers
+
+A layer's own markers travel with it when it's duplicated or moved in time, which makes them the better choice for a rig you intend to copy — comp markers stay put. `marker` on its own refers to this layer's markers.
+
+```js
+marker.numKeys
+marker.key(1).time
+marker.key(1).comment
+```
+
+### Referencing a marker by its comment
+
+Naming a marker (double-click it and type a comment) means the expression keeps working when markers get added, removed, or reordered — unlike an index, which silently shifts.
+
+```js
+thisComp.marker.key("intro").time
+```
+
+### The marker at or before the playhead
+
+`nearestKey()` returns whichever marker is closest in either direction, so it needs a step back to find the one already passed. This is the base for most marker-driven logic.
+
+```js
+n = 0;
+if (marker.numKeys > 0) {
+  n = marker.nearestKey(time).index;
+  if (marker.key(n).time > time) n--;
+}
+n > 0 ? marker.key(n).comment : ""
+```
+
+### Retrigger an animation at every marker
+
+Restarts a decaying pulse each time the playhead passes a marker, so one expression handles any number of hits without keyframes — drop markers on the beat and the layer bumps on each one.
+
+```js
+n = 0;
+if (marker.numKeys > 0) {
+  n = marker.nearestKey(time).index;
+  if (marker.key(n).time > time) n--;
+}
+if (n == 0) {
+  value
+} else {
+  t = time - marker.key(n).time;
+  value + 40 * Math.sin(t * 12) / Math.exp(7 * t);
+}
+```
+
+### Marker duration
+
+Dragging a marker's edge gives it a duration, which turns it into a region rather than a point — handy for "hold this state while the marker is under the playhead."
+
+```js
+n = 0;
+if (marker.numKeys > 0) {
+  n = marker.nearestKey(time).index;
+  if (marker.key(n).time > time) n--;
+}
+inRegion = n > 0 && time < marker.key(n).time + marker.key(n).duration;
+inRegion ? 100 : 0
+```
+
 ## Camera and lights
 
 ### Referencing the active camera
