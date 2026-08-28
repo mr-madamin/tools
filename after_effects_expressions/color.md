@@ -74,3 +74,19 @@ Rotates a fill through the color wheel continuously — apply to a shape's Fill 
 hue = (time * 30 % 360) / 360; // degrees per second, normalized to 0-1
 hslToRgb(hue, 0.8, 0.5)
 ```
+
+## Sampling
+
+### Pick a color out of another layer
+
+`sampleImage(point, radius, postEffect, t)` reads the average color of a rectangular region of a layer and returns it as `[r, g, b, a]`. It samples in the sampled layer's own space, so a position from elsewhere in the comp has to be converted first. Common uses: a text layer that tints itself to whatever it's sitting on, or a UI element picking up the color of the footage behind it.
+
+```js
+src = thisComp.layer("Backdrop");
+p = src.fromComp(toComp(anchorPoint)); // this layer's anchor, in Backdrop's space
+src.sampleImage(p, [8, 8], true, time)
+```
+
+`postEffect = true` samples after the layer's effects and masks; `false` samples the raw source. The radius is a half-width/half-height in pixels, so `[8, 8]` averages a 16×16 patch — larger radii are steadier but slower.
+
+`sampleImage` is one of the most expensive calls in the expression language. Call it once per expression, never inside a loop, and consider pairing it with `posterizeTime()` when the sampled area changes slowly.
