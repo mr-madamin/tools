@@ -145,3 +145,25 @@ Passing a start index and character count applies a setter to only part of the s
 s = "Total: 1,240";
 text.sourceText.style.setText(s).setFillColor([1, 0.42, 0.21], 7, 5)
 ```
+
+## Layout
+
+### Scale text down to fit a maximum width
+
+Measures the rendered text and shrinks it only when it overruns, so a data-driven or translated string never runs off the frame. Apply to Scale; the `false` argument excludes stroke and shadow extents from the measurement.
+
+```js
+maxW = 800;
+r = sourceRectAtTime(time, false);
+s = r.width > 0 ? Math.min(100, maxW / r.width * 100) : 100;
+[s, s]
+```
+
+### Anchor a text layer to its own bounding box
+
+A text layer's anchor point sits at the baseline origin, not at the middle of the text, so scaling or rotating a centred title pivots off-centre. This recomputes the anchor from the actual bounds each frame, which also keeps it correct as the string changes.
+
+```js
+r = sourceRectAtTime(time, false);
+[r.left + r.width / 2, r.top + r.height / 2]
+```
