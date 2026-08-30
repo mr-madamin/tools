@@ -65,3 +65,39 @@ thisComp.layer("Source").sampleImage(transform.position)
 ### Turn expressions off while working
 
 The `Enable Expressions` toggle at the bottom of the Timeline panel disables every expression in the comp at once, which is the quickest way to tell whether a slow preview is the expressions' fault.
+
+## Debugging
+
+### Errors disable the expression
+
+When an expression throws, AE shows a yellow warning, switches the expression off, and keeps the last good value. Fixing the error is not enough — the expression stays disabled until you re-enable it with the `=` toggle next to it.
+
+### Print a value into the comp
+
+There is no console. The way to inspect an intermediate value is to put it on a text layer's Source Text and look at it in the viewer.
+
+```js
+"pos: " + thisComp.layer("Ball").transform.position.value.toString()
+```
+
+### Isolate a failing sub-expression
+
+Comment out the real result and return the piece under suspicion instead. If it renders a sensible number, the problem is downstream.
+
+```js
+r = thisComp.layer("Title").sourceRectAtTime();
+r.width  // return this while debugging, not the full expression
+// [r.width + 40, r.height + 40]
+```
+
+### Fail soft on fragile references
+
+Anything that names a layer or effect by string will break when someone renames it. In a rig meant to be handed off, wrap those references so a rename degrades to the property's own value instead of taking the comp down.
+
+```js
+try {
+  thisComp.layer("Control").transform.position
+} catch (err) {
+  value
+}
+```
