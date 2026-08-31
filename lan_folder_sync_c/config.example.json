@@ -1,0 +1,5 @@
+{
+  "shared_dir": "/Users/you/SyncMe",
+  "peer": { "host": "192.168.1.42", "port": 8765 },
+  "token": "REPLACE-with-a-long-random-string-same-on-both-machines"
+}
