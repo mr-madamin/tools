@@ -8,11 +8,16 @@ Reads HTML from **stdin** and prints out SEO/social metadata:
 
 - `title`
 - `description`
-- Open Graph tags (`og:*`)
+- **All** Open Graph tags (`og:*`) — including nested ones like
+  `og:image:width`, `og:image:type`, `og:locale`, `og:site_name`, etc.
 - `canonical` link
-- `alternate` links (with `hreflang` when present)
+- **All** `alternate` links (with `hreflang` when present)
 
 It does not fetch URLs itself — you pipe HTML into it.
+
+When printing to a terminal, the tag label (the part before the colon) is
+colorized for readability. When the output is piped or redirected to a file,
+it stays plain text.
 
 ### Direct usage
 
@@ -60,11 +65,23 @@ pagemeta() {
 
 ### Example output
 
+A page can emit many tags — every `og:*` and every `alternate` link is
+printed. For example:
+
 ```
 title: Example Domain
 description: Example description from the meta tag
 og:title: Example Domain
+og:description: A longer social description
+og:locale: en_US
+og:site_name: Example
 og:type: website
+og:image: https://example.com/og.png
+og:image:width: 1200
+og:image:height: 630
+og:image:type: image/png
 canonical: https://example.com/
-alternate [en]: https://example.com/en
+alternate [en-US]: https://example.com/
+alternate [ru-RU]: https://example.ru/
+alternate [kk-KZ]: https://example.kz/kk/
 ```
