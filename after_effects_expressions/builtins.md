@@ -27,6 +27,23 @@ Reads a property's value at a different point in time than the current frame —
 thisComp.layer("Ball").transform.position.valueAtTime(time - 10/frameRate)
 ```
 
+### Smoothing a noisy or shaky value
+
+`smooth(width, samples, t)` averages the property's own value over a window of time centred on the current frame, flattening out jitter from handheld footage, tracked data, or audio keyframes without hand-cleaning every keyframe. `width` is the window in seconds, `samples` how many points inside it get averaged.
+
+```js
+smooth(0.3, 10)
+```
+
+### Reading a property's velocity and speed
+
+`velocityAtTime(t)` returns the rate of change as a vector (per dimension), `speedAtTime(t)` as a single magnitude. Both are how you drive one property off another's motion — motion blur amount, squash-and-stretch, or a trail that only shows up while something is moving.
+
+```js
+sp = thisComp.layer("Ball").transform.position.speedAtTime(time);
+linear(sp, 0, 800, 0, 100) // faster = more opaque
+```
+
 ## Repeat
 
 ### Repeating animations without keyframes
@@ -137,6 +154,33 @@ Returns a random number (or array, for multi-dimensional properties) each frame.
 
 ```js
 random(0, 100)
+```
+
+### noise()
+
+Deterministic Perlin-style noise: the same input always returns the same output (roughly `-1` to `1`), unlike `random()`, which changes every frame, and unlike `wiggle()`, which hides its sampling from you. Because you supply the input, you control the speed and can offset it per layer for variation that still stays identical across renders.
+
+```js
+// smooth drift, offset per layer so duplicates don't move in lockstep
+value + noise([time * 2, index]) * 50
+```
+
+### gaussRandom()
+
+Like `random()`, but results cluster around the middle of the range instead of spreading evenly across it — closer to how natural variation actually distributes, for scatter, particle sizes, or per-layer timing offsets.
+
+```js
+seedRandom(index, true);
+gaussRandom(0, 100)
+```
+
+### degreesToRadians() / radiansToDegrees()
+
+AE's rotation properties are in degrees, while `Math.sin`, `Math.cos`, and `Math.atan2` all work in radians. These two keep `* Math.PI / 180` from being scattered through an expression.
+
+```js
+a = degreesToRadians(transform.rotation);
+[Math.cos(a) * 100, Math.sin(a) * 100]
 ```
 
 ### Math.sin() / Math.cos() for smooth oscillation

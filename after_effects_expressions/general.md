@@ -51,7 +51,7 @@ thisComp.layer("Control").transform.position
 Common pattern for turning a behavior on/off from an effect control instead of editing the expression.
 
 ```js
-if (effect("Checkbox Control")("Checkbox") == 1) {
+if (effect("Checkbox Control")("Checkbox").value == 1) {
   value * 2
 } else {
   value
@@ -63,7 +63,7 @@ if (effect("Checkbox Control")("Checkbox") == 1) {
 Cleaner than stacking multiple Checkbox Controls once there are 3+ options — add a Dropdown Menu Control, name its items, and switch on its numeric index.
 
 ```js
-switch (effect("Direction")("Menu")) {
+switch (effect("Direction")("Menu").value) {
   case 1: value + [100, 0]; break;
   case 2: value + [-100, 0]; break;
   case 3: value + [0, 100]; break;
