@@ -35,3 +35,27 @@ Pass `isDuration = true` so the result is treated as a length rather than an abs
 timeToTimecode(time - inPoint, 1 / thisComp.frameDuration, true)
 ```
 
+## Counters
+
+### Countdown timer
+
+Counts down from a fixed duration starting at the layer's in point, formatted `M:SS`. Clamped at zero so it holds rather than going negative once the layer outlasts the countdown.
+
+```js
+total = 90; // seconds
+remaining = Math.max(0, total - (time - inPoint));
+mins = Math.floor(remaining / 60);
+secs = Math.floor(remaining % 60);
+mins + ":" + (secs < 10 ? "0" + secs : secs)
+```
+
+### Countdown down to hundredths
+
+Same idea at higher resolution — the sub-second part is what sells a stopwatch, so it needs its own zero padding.
+
+```js
+remaining = Math.max(0, effect("Duration")("Slider") - (time - inPoint));
+secs = Math.floor(remaining);
+cents = Math.floor((remaining - secs) * 100);
+secs + "." + (cents < 10 ? "0" + cents : cents)
+```
