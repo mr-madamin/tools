@@ -1,0 +1,11 @@
+# build output
+bin/
+
+# runtime scratch — source (truth) + received (peer copy), regenerated every sync
+sandbox/
+
+# large throwaway test artifacts (300MB urandom files, etc.)
+*.bin
+
+# local config carries the auth token — never commit the secret
+config.json
