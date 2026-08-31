@@ -59,3 +59,34 @@ secs = Math.floor(remaining);
 cents = Math.floor((remaining - secs) * 100);
 secs + "." + (cents < 10 ? "0" + cents : cents)
 ```
+
+## Time remapping
+
+These go on a layer's Time Remap property (`Layer > Time > Enable Time Remapping`), whose value is a time in seconds into the source.
+
+### Play forward, then hold the last frame
+
+Plays at normal speed from the layer's in point and freezes on the final frame instead of looping or going black. Backing off by one frame duration avoids landing past the end of the source.
+
+```js
+Math.min(time - inPoint, thisLayer.source.duration - thisComp.frameDuration)
+```
+
+### Constant speed change from a slider
+
+Scales playback rate off a control instead of keyframing Time Remap by hand — `1` is normal speed, `0.5` half, `2` double, negative plays backwards.
+
+```js
+speed = effect("Speed")("Slider");
+(time - inPoint) * speed
+```
+
+### Loop a section of the source
+
+Wraps playback within a start/end window using the modulo operator, so a clip cycles a chosen range regardless of the layer's length in the comp.
+
+```js
+start = 1.0;  // seconds into the source
+end = 3.5;
+start + ((time - inPoint) % (end - start))
+```
