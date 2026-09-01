@@ -140,3 +140,58 @@ void sl_free(strlist *sl)
     sl->items = NULL;
     sl->count = sl->cap = 0;
 }
+
+/* ---- paths ---------------------------------------------------------------- */
+
+char *path_join(const char *a, const char *b)
+{
+    if (b[0] == '/' || a[0] == '\0')
+        return xstrdup(b);
+
+    strbuf sb;
+    sb_init(&sb);
+    sb_addstr(&sb, a);
+    if (sb.len > 0 && sb.data[sb.len - 1] != '/')
+        sb_addch(&sb, '/');
+    sb_addstr(&sb, b);
+    return sb_detach(&sb, NULL);
+}
+
+char *path_dirname(const char *path)
+{
+    const char *slash = strrchr(path, '/');
+    if (slash == NULL)
+        return xstrdup(".");
+    if (slash == path)
+        return xstrdup("/");
+
+    size_t n = (size_t)(slash - path);
+    char *dir = xmalloc(n + 1);
+    memcpy(dir, path, n);
+    dir[n] = '\0';
+    return dir;
+}
+
+int mkdir_p(const char *path)
+{
+    char *work = xstrdup(path);
+    int rc = 0;
+
+    for (char *p = work + 1; *p != '\0'; p++)
+    {
+        if (*p != '/')
+            continue;
+        *p = '\0';
+        if (mkdir(work, 0777) != 0 && errno != EEXIST)
+        {
+            rc = -1;
+            break;
+        }
+        *p = '/';
+    }
+    if (rc == 0 && mkdir(work, 0777) != 0 && errno != EEXIST)
+        rc = -1;
+
+    free(work);
+    return rc;
+}
