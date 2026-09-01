@@ -113,3 +113,30 @@ char *sb_detach(strbuf *sb, size_t *len)
     sb->len = sb->cap = 0;
     return data;
 }
+
+/* ---- strlist -------------------------------------------------------------- */
+
+void sl_init(strlist *sl)
+{
+    sl->items = NULL;
+    sl->count = sl->cap = 0;
+}
+
+void sl_push(strlist *sl, char *owned)
+{
+    if (sl->count == sl->cap)
+    {
+        sl->cap = sl->cap ? sl->cap * 2 : 16;
+        sl->items = xrealloc(sl->items, sl->cap * sizeof(*sl->items));
+    }
+    sl->items[sl->count++] = owned;
+}
+
+void sl_free(strlist *sl)
+{
+    for (size_t i = 0; i < sl->count; i++)
+        free(sl->items[i]);
+    free(sl->items);
+    sl->items = NULL;
+    sl->count = sl->cap = 0;
+}
