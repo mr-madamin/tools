@@ -195,3 +195,62 @@ int mkdir_p(const char *path)
     free(work);
     return rc;
 }
+
+/* Python decodes every header with .decode("utf-8") and rejects what doesn't
+   fit; we have to check by hand to refuse the same frames. */
+int is_valid_utf8(const char *s, size_t len)
+{
+    const unsigned char *p = (const unsigned char *)s;
+    size_t i = 0;
+
+    while (i < len)
+    {
+        unsigned char c = p[i];
+        size_t extra;
+        unsigned int cp;
+
+        if (c < 0x80)
+        {
+            i++;
+            continue;
+        }
+        else if ((c & 0xE0) == 0xC0)
+        {
+            extra = 1;
+            cp = c & 0x1Fu;
+        }
+        else if ((c & 0xF0) == 0xE0)
+        {
+            extra = 2;
+            cp = c & 0x0Fu;
+        }
+        else if ((c & 0xF8) == 0xF0)
+        {
+            extra = 3;
+            cp = c & 0x07u;
+        }
+        else
+            return 0;
+
+        if (i + extra >= len)
+            return 0;
+        for (size_t k = 1; k <= extra; k++)
+        {
+            if ((p[i + k] & 0xC0) != 0x80)
+                return 0;
+            cp = (cp << 6) | (p[i + k] & 0x3Fu);
+        }
+        if (extra == 1 && cp < 0x80)
+            return 0; /* overlong */
+        if (extra == 2 && cp < 0x800)
+            return 0;
+        if (extra == 3 && cp < 0x10000)
+            return 0;
+        if (cp > 0x10FFFF)
+            return 0;
+        if (cp >= 0xD800 && cp <= 0xDFFF)
+            return 0; /* lone surrogate */
+        i += extra + 1;
+    }
+    return 1;
+}
