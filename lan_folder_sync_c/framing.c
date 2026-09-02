@@ -124,3 +124,80 @@ int recv_msg(int fd, char **out, size_t *out_len)
         *out_len = len;
     return FRAME_OK;
 }
+
+/* ---- files ---------------------------------------------------------------- */
+
+static double stat_mtime(const struct stat *st)
+{
+#if defined(__APPLE__)
+    return (double)st->st_mtimespec.tv_sec + st->st_mtimespec.tv_nsec / 1e9;
+#else
+    return (double)st->st_mtim.tv_sec + st->st_mtim.tv_nsec / 1e9;
+#endif
+}
+
+int send_file(int fd, const char *root_dir, const char *rel_path)
+{
+    char *full_path = path_join(root_dir, rel_path);
+
+    struct stat st;
+    if (stat(full_path, &st) != 0)
+    {
+        free(full_path);
+        return -1;
+    }
+
+    strbuf meta;
+    sb_init(&meta);
+    sb_addstr(&meta, "{\"op\": \"PUT\", \"path\": ");
+    json_escape(&meta, rel_path);
+    sb_addf(&meta, ", \"size\": %lld, \"mtime\": %.6f}", (long long)st.st_size,
+            stat_mtime(&st));
+
+    int rc = send_msg(fd, meta.data, meta.len);
+    sb_free(&meta);
+    if (rc != 0)
+    {
+        free(full_path);
+        return -1;
+    }
+
+    int src = open(full_path, O_RDONLY);
+    free(full_path);
+    if (src < 0)
+        return -1;
+
+    char buf[CHUNK];
+    for (;;)
+    {
+        ssize_t n = read(src, buf, sizeof(buf));
+        if (n == 0)
+            break;
+        if (n < 0)
+        {
+            if (errno == EINTR)
+                continue;
+            close(src);
+            return -1;
+        }
+        if (send_all(fd, buf, (size_t)n) != 0)
+        {
+            close(src);
+            return -1;
+        }
+    }
+    close(src);
+    return 0;
+}
+
+int send_delete(int fd, const char *rel_path)
+{
+    strbuf sb;
+    sb_init(&sb);
+    sb_addstr(&sb, "{\"op\": \"DELETE\", \"path\": ");
+    json_escape(&sb, rel_path);
+    sb_addch(&sb, '}');
+    int rc = send_msg(fd, sb.data, sb.len);
+    sb_free(&sb);
+    return rc;
+}
