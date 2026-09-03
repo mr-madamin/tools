@@ -201,3 +201,83 @@ int send_delete(int fd, const char *rel_path)
     sb_free(&sb);
     return rc;
 }
+
+/* A cheap first pass: no absolute paths, no ".." component. Runs before we
+   create any directories, so a traversal never gets to mkdir anything. */
+int path_is_lexically_safe(const char *rel_path)
+{
+    if (rel_path[0] == '\0' || rel_path[0] == '/')
+        return 0;
+
+    const char *p = rel_path;
+    while (*p != '\0')
+    {
+        const char *slash = strchr(p, '/');
+        size_t n = slash != NULL ? (size_t)(slash - p) : strlen(p);
+        if (n == 2 && p[0] == '.' && p[1] == '.')
+            return 0;
+        if (slash == NULL)
+            break;
+        p = slash + 1;
+    }
+    return 1;
+}
+
+/* Resolve `rel_path` under `base` and refuse anything that lands outside it.
+   ".." and absolute paths are already gone by the time we get here, so the one
+   remaining escape is a symlink: walk the path a component at a time and, each
+   time a component *is* a link, resolve it and re-check containment. Unlike
+   realpath() on the whole thing, this works for a path that doesn't exist yet
+   — which is the normal case for a PUT, and for an idempotent DELETE. */
+char *safe_path(const char *base, const char *rel_path)
+{
+    char base_real[PATH_MAX];
+    if (realpath(base, base_real) == NULL)
+        return NULL;
+    if (!path_is_lexically_safe(rel_path))
+        return NULL;
+
+    size_t base_len = strlen(base_real);
+    char *cur = xstrdup(base_real);
+    char *rest = xstrdup(rel_path);
+
+    for (char *comp = strtok(rest, "/"); comp != NULL; comp = strtok(NULL, "/"))
+    {
+        if (comp[0] == '\0' || strcmp(comp, ".") == 0)
+            continue;
+
+        char *next = path_join(cur, comp);
+        free(cur);
+
+        struct stat lst;
+        if (lstat(next, &lst) == 0 && S_ISLNK(lst.st_mode))
+        {
+            char resolved[PATH_MAX];
+            if (realpath(next, resolved) == NULL)
+            { /* broken link — refuse it */
+                free(next);
+                free(rest);
+                return NULL;
+            }
+            free(next);
+            next = xstrdup(resolved);
+        }
+
+        if (strncmp(next, base_real, base_len) != 0 ||
+            (next[base_len] != '/' && next[base_len] != '\0'))
+        {
+            free(next);
+            free(rest);
+            return NULL;
+        }
+        cur = next;
+    }
+
+    free(rest);
+    if (strcmp(cur, base_real) == 0)
+    { /* the path named the root itself */
+        free(cur);
+        return NULL;
+    }
+    return cur;
+}
