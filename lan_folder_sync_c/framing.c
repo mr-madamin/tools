@@ -281,3 +281,120 @@ char *safe_path(const char *base, const char *rel_path)
     }
     return cur;
 }
+
+int recv_file_body(int fd, const char *dest_dir, const json_value *header,
+                   char **rel_out, const char **missing)
+{
+    const char *rel_path = json_get_str(header, "path");
+    double size_d, mtime;
+
+    if (rel_path == NULL)
+    {
+        *missing = "path";
+        return BODY_MISSING;
+    }
+    if (!json_get_num(header, "size", &size_d))
+    {
+        *missing = "size";
+        return BODY_MISSING;
+    }
+    if (!json_get_num(header, "mtime", &mtime))
+    {
+        *missing = "mtime";
+        return BODY_MISSING;
+    }
+
+    long long size = (long long)size_d;
+
+    /* Check the path before creating anything: mkdir_p on "../evil/x" would
+       make directories outside dest_dir before realpath ever got a look in. */
+    if (!path_is_lexically_safe(rel_path))
+        return BODY_UNSAFE;
+
+    char *full_path = path_join(dest_dir, rel_path);
+    char *dir = path_dirname(full_path);
+    if (mkdir_p(dir) != 0)
+    {
+        free(dir);
+        free(full_path);
+        return BODY_IO;
+    }
+    free(dir);
+
+    /* The parent exists now, so the traversal guard can resolve it. Unlike the
+       Python server (which only guards DELETE), we refuse escaping PUTs too. */
+    char *safe = safe_path(dest_dir, rel_path);
+    if (safe == NULL)
+    {
+        free(full_path);
+        return BODY_UNSAFE;
+    }
+    free(full_path);
+
+    int dst = open(safe, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (dst < 0)
+    {
+        free(safe);
+        return BODY_IO;
+    }
+
+    char buf[CHUNK];
+    long long received = 0;
+    while (received < size)
+    {
+        size_t want = (size_t)(size - received);
+        if (want > sizeof(buf))
+            want = sizeof(buf);
+        ssize_t n = recv(fd, buf, want, 0);
+        if (n == 0)
+        { /* peer closed mid-file — truncated transfer */
+            close(dst);
+            free(safe);
+            return BODY_IO;
+        }
+        if (n < 0)
+        {
+            if (errno == EINTR)
+                continue;
+            close(dst);
+            free(safe);
+            return BODY_IO;
+        }
+        if (write(dst, buf, (size_t)n) != n)
+        {
+            close(dst);
+            free(safe);
+            return BODY_IO;
+        }
+        received += n;
+    }
+    close(dst);
+
+    struct timeval times[2];
+    times[0].tv_sec = times[1].tv_sec = (time_t)mtime;
+    times[0].tv_usec = times[1].tv_usec = (suseconds_t)((mtime - floor(mtime)) * 1e6);
+    utimes(safe, times);
+    free(safe);
+
+    *rel_out = xstrdup(rel_path);
+    return BODY_OK;
+}
+
+int recv_file(int fd, const char *dest_dir, char **rel_out)
+{
+    char *payload = NULL;
+    size_t len = 0;
+    int rc = recv_msg(fd, &payload, &len);
+    if (rc != FRAME_OK)
+        return rc;
+
+    json_value *header = json_parse(payload, len);
+    free(payload);
+    if (header == NULL)
+        return FRAME_ERR;
+
+    const char *missing = NULL;
+    int body = recv_file_body(fd, dest_dir, header, rel_out, &missing);
+    json_free(header);
+    return body == BODY_OK ? FRAME_OK : FRAME_ERR;
+}
