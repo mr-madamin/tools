@@ -398,3 +398,26 @@ int recv_file(int fd, const char *dest_dir, char **rel_out)
     json_free(header);
     return body == BODY_OK ? FRAME_OK : FRAME_ERR;
 }
+
+int handshake(int fd, const char *token, json_value **reply)
+{
+    strbuf sb;
+    sb_init(&sb);
+    sb_addstr(&sb, "{\"op\": \"HELLO\", \"token\": ");
+    json_escape(&sb, token);
+    sb_addch(&sb, '}');
+    int rc = send_msg(fd, sb.data, sb.len);
+    sb_free(&sb);
+    if (rc != 0)
+        return FRAME_ERR;
+
+    char *payload = NULL;
+    size_t len = 0;
+    rc = recv_msg(fd, &payload, &len);
+    if (rc != FRAME_OK)
+        return rc;
+
+    *reply = json_parse(payload, len);
+    free(payload);
+    return *reply != NULL ? FRAME_OK : FRAME_ERR;
+}
