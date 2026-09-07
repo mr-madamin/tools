@@ -421,3 +421,88 @@ int handshake(int fd, const char *token, json_value **reply)
     free(payload);
     return *reply != NULL ? FRAME_OK : FRAME_ERR;
 }
+
+/* ---- manifests ------------------------------------------------------------ */
+
+void manifest_init(manifest *m)
+{
+    m->items = NULL;
+    m->count = m->cap = 0;
+}
+
+void manifest_free(manifest *m)
+{
+    for (size_t i = 0; i < m->count; i++)
+        free(m->items[i].path);
+    free(m->items);
+    manifest_init(m);
+}
+
+static void manifest_push(manifest *m, char *path, long long size, double mtime)
+{
+    if (m->count == m->cap)
+    {
+        m->cap = m->cap ? m->cap * 2 : 64;
+        m->items = xrealloc(m->items, m->cap * sizeof(*m->items));
+    }
+    m->items[m->count].path = path;
+    m->items[m->count].size = size;
+    m->items[m->count].mtime = mtime;
+    m->count++;
+}
+
+/* Recursive half of build_manifest. `prefix` is the path relative to the root;
+   `full` is the real directory being read. */
+static int walk(const char *full, strbuf *prefix, manifest *m)
+{
+    DIR *dir = opendir(full);
+    if (dir == NULL)
+        return -1;
+
+    struct dirent *entry;
+    size_t prefix_len = prefix->len;
+
+    while ((entry = readdir(dir)) != NULL)
+    {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
+
+        char *child = path_join(full, entry->d_name);
+
+        struct stat lst;
+        if (lstat(child, &lst) != 0)
+        {
+            free(child);
+            continue;
+        }
+
+        sb_truncate(prefix, prefix_len);
+        if (prefix->len > 0)
+            sb_addch(prefix, '/');
+        sb_addstr(prefix, entry->d_name);
+
+        if (S_ISDIR(lst.st_mode))
+        {
+            walk(child, prefix, m);
+        }
+        else if (S_ISLNK(lst.st_mode))
+        {
+            /* os.walk doesn't follow symlinked directories; a symlinked file
+               still shows up, stat()ed through the link. */
+            struct stat st;
+            if (stat(child, &st) == 0 && !S_ISDIR(st.st_mode))
+                manifest_push(m, xstrdup(prefix->data), (long long)st.st_size,
+                              stat_mtime(&st));
+        }
+        else
+        {
+            manifest_push(m, xstrdup(prefix->data), (long long)lst.st_size,
+                          stat_mtime(&lst));
+        }
+        free(child);
+    }
+
+    sb_truncate(prefix, prefix_len);
+    closedir(dir);
+    return 0;
+}
