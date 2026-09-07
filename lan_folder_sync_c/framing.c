@@ -506,3 +506,99 @@ static int walk(const char *full, strbuf *prefix, manifest *m)
     closedir(dir);
     return 0;
 }
+
+int build_manifest(const char *root_dir, manifest *m)
+{
+    manifest_init(m);
+    strbuf prefix;
+    sb_init(&prefix);
+    int rc = walk(root_dir, &prefix, m);
+    sb_free(&prefix);
+    return rc; /* a missing root yields an empty manifest, as os.walk does */
+}
+
+char *manifest_to_json(const manifest *m)
+{
+    strbuf sb;
+    sb_init(&sb);
+    sb_addch(&sb, '{');
+    for (size_t i = 0; i < m->count; i++)
+    {
+        if (i > 0)
+            sb_addstr(&sb, ", ");
+        json_escape(&sb, m->items[i].path);
+        sb_addf(&sb, ": {\"size\": %lld, \"mtime\": %.6f}", m->items[i].size,
+                m->items[i].mtime);
+    }
+    sb_addch(&sb, '}');
+    return sb_detach(&sb, NULL);
+}
+
+int manifest_from_json(const json_value *files, manifest *m)
+{
+    manifest_init(m);
+    if (files == NULL || files->type != JSON_OBJECT)
+        return -1;
+
+    for (size_t i = 0; i < files->count; i++)
+    {
+        const json_value *info = files->items[i];
+        double size = 0, mtime = 0;
+        if (!json_get_num(info, "size", &size) || !json_get_num(info, "mtime", &mtime))
+            continue;
+        manifest_push(m, xstrdup(files->keys[i]), (long long)size, mtime);
+    }
+    return 0;
+}
+
+static int by_path(const void *a, const void *b)
+{
+    const manifest_entry *x = a, *y = b;
+    return strcmp(x->path, y->path);
+}
+
+/* Python looks each path up in a dict; we sort both sides once and merge, which
+   costs a sort but keeps the whole thing dependency-free. */
+void diff_manifests(const manifest *local, const manifest *remote, double tolerance,
+                    strlist *to_put, strlist *to_delete)
+{
+    manifest l = *local, r = *remote;
+    manifest_entry *ls = xmalloc(l.count * sizeof(*ls) + 1);
+    manifest_entry *rs = xmalloc(r.count * sizeof(*rs) + 1);
+    memcpy(ls, l.items, l.count * sizeof(*ls));
+    memcpy(rs, r.items, r.count * sizeof(*rs));
+    qsort(ls, l.count, sizeof(*ls), by_path);
+    qsort(rs, r.count, sizeof(*rs), by_path);
+
+    size_t i = 0, j = 0;
+    while (i < l.count || j < r.count)
+    {
+        int cmp;
+        if (i < l.count && j < r.count)
+            cmp = strcmp(ls[i].path, rs[j].path);
+        else
+            cmp = i < l.count ? -1 : 1;
+
+        if (cmp < 0)
+        {
+            sl_push(to_put, xstrdup(ls[i].path)); /* peer doesn't have it */
+            i++;
+        }
+        else if (cmp > 0)
+        {
+            sl_push(to_delete, xstrdup(rs[j].path)); /* we don't have it */
+            j++;
+        }
+        else
+        {
+            if (ls[i].size != rs[j].size ||
+                fabs(ls[i].mtime - rs[j].mtime) > tolerance)
+                sl_push(to_put, xstrdup(ls[i].path));
+            i++;
+            j++;
+        }
+    }
+
+    free(ls);
+    free(rs);
+}
