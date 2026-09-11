@@ -146,3 +146,49 @@ terminal:
 python3 sync_server.py                 # loopback, in one terminal
 python3 -m tests.hello_test            # in another  (NOT python3 tests/hello_test.py)
 ```
+
+## 8. When the push just sits there
+
+`sync_push.py` narrates its own connection. A healthy start looks like:
+
+```
+Push /Users/alice/folder  ->  192.168.1.42:8765
+  this Mac: 192.168.1.7 (same subnet as the peer)
+Connecting (timeout 8s) ...
+  connected in 0.01s
+  handshake ok (token accepted)
+```
+
+If it can't connect it now **fails in 8 seconds with a diagnosis** instead of
+blocking for ~75s in the kernel with a blank screen. The three outcomes:
+
+- **"No answer … after 8s"** — the packet is being *dropped*. Receiver's
+  firewall (System Settings → Network → Firewall; stealth mode drops exactly
+  like this), router client isolation, or a wrong/stale IP.
+- **"Connection refused"** — the host answered, nothing is listening there.
+  Server not running, or started without `--lan` (it then binds `127.0.0.1`
+  only and refuses connections arriving on the LAN IP).
+- **"Can't reach …"** — no route at all. Not on Wi-Fi, or a VPN took the LAN
+  route (the push says so if it sees a tunnel interface).
+
+The fastest split is the receiver's own terminal: it prints
+`Connected from <ip>` the moment a peer arrives. **Silent server + waiting
+client = the packet never got there** — look at the firewall and the router,
+not at this code.
+
+Two commands settle most of it, run from the source:
+
+```
+ping -c 3 192.168.1.42       # no replies → network, not the port
+nc -vz 192.168.1.42 8765     # 'succeeded' → the port is open; rerun the push
+```
+
+**The IP changes.** DHCP reassigns it after a reboot or a long sleep, and the
+old address usually belongs to nothing — which is what a silent hang looks
+like. Re-check it on the receiver (`ipconfig getifaddr en0`) before assuming
+anything more exotic.
+
+Other guards the push applies before it sends a byte: unknown flags are
+rejected (`--dryrun` no longer silently pushes for real), a missing or
+`~`-prefixed `root_dir` stops the run, and `--delete` from an **empty** source
+is refused outright rather than mirroring an empty folder onto the peer.
