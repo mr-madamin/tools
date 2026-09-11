@@ -1,11 +1,11 @@
 import json
 import os
 import socket
-import subprocess
 import sys
 
 from config import load_config
 from framing import build_manifest, recv_file_body, recv_msg, send_error, send_msg
+from netutil import lan_ip
 
 cfg = load_config()
 TOKEN = cfg["token"]
@@ -19,22 +19,6 @@ SHARED_DIR = (
 PORT = int(
     positional[1] if len(positional) > 1 else cfg.get("peer", {}).get("port", 8765)
 )
-
-
-def lan_ip():
-    """This Mac's en0 IPv4 (Wi-Fi, usually), or '' if offline / not on en0"""
-    try:
-        out = subprocess.run(
-            ["ipconfig", "getifaddr", "en0"],
-            capture_output=True,
-            text=True,
-            timeout=2,
-            check=False,
-        )
-        return out.stdout.strip()
-    except (OSError, subprocess.SubprocessError):
-        return ""
-
 
 if "--lan" in flags:
     BIND_HOST = lan_ip()
