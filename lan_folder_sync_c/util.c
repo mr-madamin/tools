@@ -1,11 +1,13 @@
 #include "util.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 _Noreturn void die(const char *fmt, ...)
 {
@@ -170,6 +172,19 @@ char *path_dirname(const char *path)
     memcpy(dir, path, n);
     dir[n] = '\0';
     return dir;
+}
+
+/* Lexical only, like os.path.abspath: no realpath(), so it still names a path
+   that doesn't exist — which is exactly the case we want to print about. */
+char *path_abs(const char *path)
+{
+    if (path[0] == '/')
+        return xstrdup(path);
+
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) == NULL)
+        return xstrdup(path);
+    return path_join(cwd, path);
 }
 
 int mkdir_p(const char *path)

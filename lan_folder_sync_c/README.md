@@ -128,6 +128,12 @@ Same guarantees as the Python version, plus one:
 - **Dry-run first.** `--dry-run` shows the full plan before you commit to it.
 - **`--delete` mirrors deletions** — it removes files on the receiver. A mistyped
   or empty source could delete a lot; preview with `--dry-run --delete` first.
+- **An empty source can't wipe the peer.** `sync_push` refuses three ways of
+  arriving at "the source has nothing, so delete everything": a `root_dir`
+  starting with `~` (never expanded), a `root_dir` that isn't a directory, and a
+  real folder that walks to zero files while `--delete` is set. The first two
+  exit before connecting. `--dry-run --delete` still prints the full plan, so
+  you can see what the guard just stopped.
 - **The token is required on every connection.** No token, or the wrong one, and
   the server refuses the session.
 - **Paths are confined to `shared_dir`** — for `DELETE` *and* for `PUT`. Absolute

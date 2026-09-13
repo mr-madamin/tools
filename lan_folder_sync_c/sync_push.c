@@ -3,19 +3,33 @@
    nothing; --delete turns "the peer has extras" into actual removals. */
 #include <arpa/inet.h>
 #include <errno.h>
+#include <limits.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "config.h"
 #include "framing.h"
 #include "json.h"
 #include "util.h"
+
+/* Python's hint(): a warning that isn't fatal, set off from the normal log. */
+static void hint(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    printf("  ! ");
+    vprintf(fmt, ap);
+    printf("\n");
+    va_end(ap);
+}
 
 static int dial(const char *host, int port)
 {
@@ -78,6 +92,23 @@ int main(int argc, char **argv)
                            : cfg->shared_dir != NULL ? cfg->shared_dir
                                                      : "sandbox/source";
 
+    printf("Push %s  ->  %s:%d\n", root_dir, host, port);
+
+    /* Both of these end in an empty local manifest, which with --delete reads as
+       "the source has nothing, so remove everything" — check before we connect. */
+    if (root_dir[0] == '~')
+        die("root_dir '%s' starts with '~', which is NOT expanded here --\n"
+            "it would walk an empty folder and push nothing. Use an absolute path.",
+            root_dir);
+
+    struct stat root_st;
+    if (stat(root_dir, &root_st) != 0 || !S_ISDIR(root_st.st_mode)) {
+        char cwd[PATH_MAX];
+        die("root_dir does not exist: %s\n"
+            "(cwd: %s) -- check the path, or mkdir -p it.",
+            path_abs(root_dir), getcwd(cwd, sizeof(cwd)) != NULL ? cwd : "?");
+    }
+
     int sock = dial(host, port);
 
     json_value *reply = NULL;
@@ -118,6 +149,17 @@ int main(int argc, char **argv)
     if (dry_run)
         printf("DRY RUN - no files will be sent\n");
     printf("Local: %zu files | Peer: %zu files\n", local.count, remote.count);
+
+    /* An empty source is almost always a wrong path, not a real "delete
+       everything" — refuse to mirror it. --dry-run still shows the plan. */
+    if (local.count == 0) {
+        char *abs = path_abs(root_dir);
+        hint("no files found under %s", abs);
+        free(abs);
+        hint("is that the right folder? nothing will be sent");
+        if (delete_extras && !dry_run)
+            die("refusing to run --delete from an empty source: it would wipe the peer.");
+    }
 
     printf("%s %zu file(s):\n", dry_run ? "Would send" : "Sending", to_put.count);
     for (size_t i = 0; i < to_put.count; i++) {

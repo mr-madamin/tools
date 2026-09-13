@@ -44,6 +44,7 @@ void sl_free(strlist *sl);
 
 char *path_join(const char *a, const char *b); /* os.path.join, roughly */
 char *path_dirname(const char *path);          /* os.path.dirname */
+char *path_abs(const char *path);              /* os.path.abspath */
 int mkdir_p(const char *path);                 /* os.makedirs(exist_ok=True) */
 
 int is_valid_utf8(const char *s, size_t len);
