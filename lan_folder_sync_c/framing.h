@@ -9,13 +9,21 @@
 #include "json.h"
 #include "util.h"
 
-/* Read/receive results: 1 = got it, 0 = peer closed (EOF), -1 = I/O error. */
-#define FRAME_OK  1
-#define FRAME_EOF 0
-#define FRAME_ERR (-1)
+/* Read/receive results: 1 = got it, 0 = peer closed (EOF), -1 = I/O error,
+   -2 = the socket timeout expired with the peer neither sending nor closing.
+   A timeout is worth its own code: "the peer is wedged" and "the peer hung up"
+   need very different advice. */
+#define FRAME_OK      1
+#define FRAME_EOF     0
+#define FRAME_ERR    (-1)
+#define FRAME_TIMEOUT (-2)
+
+/* Bound every later blocking recv/send on this socket. Python spells the whole
+   of this sock.settimeout(); 0 seconds clears it. */
+int sock_set_timeout(int fd, int seconds);
 
 int recv_exactly(int fd, void *buf, size_t n);
-int send_all(int fd, const void *buf, size_t n);
+int send_all(int fd, const void *buf, size_t n); /* 0, -1, or FRAME_TIMEOUT */
 
 int send_msg(int fd, const void *payload, size_t len);
 int send_json(int fd, const char *json); /* send_msg over a NUL-terminated string */
@@ -32,6 +40,7 @@ int send_delete(int fd, const char *rel_path);
 #define BODY_MISSING (-1) /* header lacked path/size/mtime — *missing names it */
 #define BODY_IO      (-2) /* peer closed mid-file, or a local write failed */
 #define BODY_UNSAFE  (-3) /* path would escape dest_dir */
+#define BODY_TIMEOUT (-4) /* peer went quiet mid-file without closing */
 
 int recv_file_body(int fd, const char *dest_dir, const json_value *header,
                    char **rel_out, const char **missing);

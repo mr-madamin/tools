@@ -17,6 +17,23 @@
 
 /* ---- byte plumbing -------------------------------------------------------- */
 
+int sock_set_timeout(int fd, int seconds)
+{
+    struct timeval tv;
+    tv.tv_sec = seconds;
+    tv.tv_usec = 0;
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) != 0)
+        return -1;
+    return setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+}
+
+/* SO_RCVTIMEO/SO_SNDTIMEO surface as EAGAIN (== EWOULDBLOCK on macOS). That's
+   the timeout, not a real error — the two get different advice upstream. */
+static int is_timeout(int e)
+{
+    return e == EAGAIN || e == EWOULDBLOCK;
+}
+
 /* Read exactly n bytes, or report that the peer closed first. The loop is the
    whole point: one recv() can return short, and regularly does. */
 int recv_exactly(int fd, void *buf, size_t n)
@@ -33,7 +50,10 @@ int recv_exactly(int fd, void *buf, size_t n)
         {
             if (errno == EINTR)
                 continue;
-            return FRAME_ERR;
+            /* Partial data is abandoned here: once a frame arrives half-read
+               the stream has no boundary left to resync on, so every caller
+               ends the session. */
+            return is_timeout(errno) ? FRAME_TIMEOUT : FRAME_ERR;
         }
         got += (size_t)r;
     }
@@ -52,7 +72,7 @@ int send_all(int fd, const void *buf, size_t n)
         {
             if (errno == EINTR)
                 continue;
-            return -1;
+            return is_timeout(errno) ? FRAME_TIMEOUT : -1;
         }
         sent += (size_t)w;
     }
@@ -159,7 +179,7 @@ int send_file(int fd, const char *root_dir, const char *rel_path)
     if (rc != 0)
     {
         free(full_path);
-        return -1;
+        return rc; /* may be FRAME_TIMEOUT: the peer stopped reading */
     }
 
     int src = open(full_path, O_RDONLY);
@@ -180,10 +200,11 @@ int send_file(int fd, const char *root_dir, const char *rel_path)
             close(src);
             return -1;
         }
-        if (send_all(fd, buf, (size_t)n) != 0)
+        int src_rc = send_all(fd, buf, (size_t)n);
+        if (src_rc != 0)
         {
             close(src);
-            return -1;
+            return src_rc;
         }
     }
     close(src);
@@ -356,9 +377,10 @@ int recv_file_body(int fd, const char *dest_dir, const json_value *header,
         {
             if (errno == EINTR)
                 continue;
+            int stalled = is_timeout(errno);
             close(dst);
             free(safe);
-            return BODY_IO;
+            return stalled ? BODY_TIMEOUT : BODY_IO;
         }
         if (write(dst, buf, (size_t)n) != n)
         {

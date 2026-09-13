@@ -11,6 +11,11 @@
 static char probe[64];
 static char victim[64];
 static char victim_path[256]; /* a sibling of received/, i.e. OUTSIDE it */
+/* One real file in the source, so the push isn't "mirror an empty folder" —
+   sync_push refuses --delete from an empty source, and rightly so. */
+static char anchor[64];
+static char anchor_src[256];
+static char anchor_peer[256];
 
 /* Run the REAL sync_push with extra flags; assert it exited clean. */
 static char *push(const char *extra_flags)
@@ -68,6 +73,8 @@ static void cleanup(void)
     snprintf(path, sizeof(path), "%s/sub/%s", PEER_DIR, probe);
     unlink(path);
     unlink(victim_path);
+    unlink(anchor_src);
+    unlink(anchor_peer);
     snprintf(path, sizeof(path), "%s/sub", PEER_DIR);
     rmdir(path); /* only succeeds if it's empty, which is what we want */
 }
@@ -77,10 +84,14 @@ int main(void)
     snprintf(probe, sizeof(probe), "_delete_probe_%d.txt", (int)getpid());
     snprintf(victim, sizeof(victim), "_delete_victim_%d.txt", (int)getpid());
     snprintf(victim_path, sizeof(victim_path), "%s/%s", SANDBOX, victim);
+    snprintf(anchor, sizeof(anchor), "_delete_anchor_%d.txt", (int)getpid());
+    snprintf(anchor_src, sizeof(anchor_src), "%s/%s", ROOT_DIR, anchor);
+    snprintf(anchor_peer, sizeof(anchor_peer), "%s/%s", PEER_DIR, anchor);
     atexit(cleanup);
 
     mkdir_p(ROOT_DIR);
     mkdir_p(PEER_DIR);
+    write_text_file(anchor_src, "anchor\n");
 
     section("DELETE behavior");
 

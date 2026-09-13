@@ -148,6 +148,17 @@ Same guarantees as the Python version, plus one:
   this; `sync_server.py` does not, so a typo'd `--lann` silently serves loopback
   there. The second thing worth porting back.
 
+- **Nothing blocks forever.** `sync_push` bounds each phase the way
+  `sync_push.py` does — 8 s to connect, 15 s for a HELLO or MANIFEST reply,
+  300 s for a stalled send — and says which one expired, since "the packet never
+  arrived" and "the peer accepted and went quiet" need opposite fixes. A dropped
+  SYN now fails in 8 s instead of macOS's ~75 s default.
+
+  `sync_server` bounds a session at 300 s of silence. It serves one peer at a
+  time, so before this a single client that connected and said nothing locked
+  out everyone else until the process was killed. **`sync_server.py` still has
+  that wedge** — it has no timeouts at all. The third thing worth porting back.
+
   **This is the main deliberate behaviour difference.** `sync_server.py` runs its
   confinement guard on `DELETE` only; `recv_file_body` joins the incoming path
   onto `shared_dir` and writes it unchecked, so a hand-crafted `PUT` with

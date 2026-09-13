@@ -21,6 +21,15 @@
 
 static const char *USAGE = "usage: sync_server [shared_dir] [port] [--lan]";
 
+/* The server handles one session at a time, so a peer that connects and then
+   says nothing isn't just its own problem — it locks out everyone else until
+   this process is killed. Bound the wait. Generous, because a legitimate peer
+   can be busy walking a large folder between frames. Overridable at build time
+   so the wedge can actually be tested without waiting five minutes. */
+#ifndef SESSION_TIMEOUT
+#define SESSION_TIMEOUT 300
+#endif
+
 /* This Mac's en0 IPv4 (Wi-Fi, usually), or NULL if offline / not on en0.
    Python shells out to `ipconfig getifaddr en0`; getifaddrs() is the same
    answer without a subprocess. */
@@ -160,6 +169,7 @@ int main(int argc, char **argv)
         inet_ntop(AF_INET, &peer.sin_addr, ip, sizeof(ip));
         printf("Connected from %s:%d\n", ip, ntohs(peer.sin_port));
 
+        sock_set_timeout(conn, SESSION_TIMEOUT);
         serve_session(conn, shared_dir, cfg->token);
         close(conn);
         printf("Session ended, waiting for next peer\n");
@@ -175,9 +185,12 @@ static void serve_session(int conn, const char *shared_dir, const char *token)
         size_t len = 0;
         int rc = recv_msg(conn, &payload, &len);
         if (rc != FRAME_OK) {
-            if (rc == FRAME_ERR)
+            if (rc == FRAME_TIMEOUT)
+                printf("Session timed out: peer idle for %ds, dropping it\n",
+                       SESSION_TIMEOUT);
+            else if (rc == FRAME_ERR)
                 printf("Session error: connection lost\n");
-            break; /* peer vanished */
+            break; /* peer vanished, or went quiet and stayed quiet */
         }
 
         json_value *header = NULL;
@@ -247,6 +260,12 @@ static void serve_session(int conn, const char *shared_dir, const char *token)
                 sb_addf(&sb, "unsafe path refused: '%s'", bad != NULL ? bad : "");
                 send_error(conn, sb.data);
                 sb_free(&sb);
+                json_free(header);
+                break;
+            }
+            if (body == BODY_TIMEOUT) {
+                printf("Session timed out: peer stalled mid-file after %ds\n",
+                       SESSION_TIMEOUT);
                 json_free(header);
                 break;
             }
