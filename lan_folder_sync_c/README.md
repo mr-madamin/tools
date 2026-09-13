@@ -102,6 +102,10 @@ Positional overrides work exactly as in the Python version:
 - `sync_push <peer_host> <root_dir> [--flags]` (push port still comes from
   `config.json` `peer.port`)
 
+Both accept `--help`, and both **reject** an unrecognised `--flag` instead of
+ignoring it — a typo like `--dryrun` would otherwise push for real, and
+`--lann` would bind loopback while you believed you were serving the LAN.
+
 ## 6. The protocol (identical to the Python version)
 
 A frame is a **4-byte big-endian length prefix** followed by a **UTF-8 JSON
@@ -140,7 +144,11 @@ Same guarantees as the Python version, plus one:
   paths and any `..` component are rejected before anything touches the disk, and
   each surviving component is re-checked after symlink resolution.
 
-  **This is the one deliberate behaviour difference.** `sync_server.py` runs its
+- **Unknown flags are refused, on both programs.** `sync_push.py` already does
+  this; `sync_server.py` does not, so a typo'd `--lann` silently serves loopback
+  there. The second thing worth porting back.
+
+  **This is the main deliberate behaviour difference.** `sync_server.py` runs its
   confinement guard on `DELETE` only; `recv_file_body` joins the incoming path
   onto `shared_dir` and writes it unchecked, so a hand-crafted `PUT` with
   `"path": "../../x"` writes outside the shared folder on the Python receiver.

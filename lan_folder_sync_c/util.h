@@ -40,6 +40,12 @@ void sl_init(strlist *sl);
 void sl_push(strlist *sl, char *owned);
 void sl_free(strlist *sl);
 
+/* ---- argv ---------------------------------------------------------------- */
+
+/* Exit listing the unknown --flags (sorted, deduped) above a usage line. A
+   silently-ignored typo like --dryrun is how a preview becomes a real push. */
+_Noreturn void die_unknown_flags(strlist *unknown, const char *usage);
+
 /* ---- paths --------------------------------------------------------------- */
 
 char *path_join(const char *a, const char *b); /* os.path.join, roughly */

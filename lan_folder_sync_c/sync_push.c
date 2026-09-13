@@ -20,6 +20,9 @@
 #include "json.h"
 #include "util.h"
 
+static const char *USAGE =
+    "usage: sync_push [peer_host] [root_dir] [--delete | --dry-run]";
+
 /* Python's hint(): a warning that isn't fatal, set off from the normal log. */
 static void hint(const char *fmt, ...)
 {
@@ -70,6 +73,8 @@ int main(int argc, char **argv)
     int dry_run = 0, delete_extras = 0;
     const char *positional[2] = { NULL, NULL };
     size_t npos = 0;
+    strlist unknown;
+    sl_init(&unknown);
 
     for (int i = 1; i < argc; i++) {
         if (strncmp(argv[i], "--", 2) == 0) {
@@ -77,10 +82,24 @@ int main(int argc, char **argv)
                 dry_run = 1;
             else if (strcmp(argv[i], "--delete") == 0)
                 delete_extras = 1;
+            else if (strcmp(argv[i], "--help") == 0) {
+                printf("%s\n\n%s\n", USAGE,
+                       "  --dry-run   print the plan (puts and deletes), send nothing\n"
+                       "  --delete    also remove files the peer has and the source\n"
+                       "              doesn't, making the peer an exact mirror\n"
+                       "  --help      this message\n\n"
+                       "peer_host defaults to config.json peer.host, root_dir to\n"
+                       "shared_dir. The port always comes from config.json peer.port.");
+                return 0;
+            } else
+                sl_push(&unknown, xstrdup(argv[i]));
         } else if (npos < 2) {
             positional[npos++] = argv[i];
         }
     }
+    if (unknown.count > 0)
+        die_unknown_flags(&unknown, USAGE);
+    sl_free(&unknown);
 
     config *cfg = load_config(argv[0]);
 

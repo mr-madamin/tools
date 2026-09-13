@@ -143,7 +143,32 @@ void sl_free(strlist *sl)
     sl->count = sl->cap = 0;
 }
 
+/* ---- argv ----------------------------------------------------------------- */
+
+static int by_string(const void *a, const void *b)
+{
+    return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
+
 /* ---- paths ---------------------------------------------------------------- */
+
+_Noreturn void die_unknown_flags(strlist *unknown, const char *usage)
+{
+    qsort(unknown->items, unknown->count, sizeof(*unknown->items), by_string);
+
+    strbuf sb;
+    sb_init(&sb);
+    sb_addstr(&sb, "unknown flag(s):");
+    for (size_t i = 0; i < unknown->count; i++)
+    {
+        /* Python diffs two sets, so a repeated flag is listed once. */
+        if (i > 0 && strcmp(unknown->items[i], unknown->items[i - 1]) == 0)
+            continue;
+        sb_addch(&sb, ' ');
+        sb_addstr(&sb, unknown->items[i]);
+    }
+    die("%s\n%s", sb.data, usage); /* sb leaks; we're on our way out */
+}
 
 char *path_join(const char *a, const char *b)
 {

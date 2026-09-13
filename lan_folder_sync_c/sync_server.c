@@ -19,6 +19,8 @@
 #include "json.h"
 #include "util.h"
 
+static const char *USAGE = "usage: sync_server [shared_dir] [port] [--lan]";
+
 /* This Mac's en0 IPv4 (Wi-Fi, usually), or NULL if offline / not on en0.
    Python shells out to `ipconfig getifaddr en0`; getifaddrs() is the same
    answer without a subprocess. */
@@ -78,14 +80,31 @@ int main(int argc, char **argv)
     int want_lan = 0;
     const char *positional[2] = { NULL, NULL };
     size_t npos = 0;
+    strlist unknown;
+    sl_init(&unknown);
+
     for (int i = 1; i < argc; i++) {
         if (strncmp(argv[i], "--", 2) == 0) {
             if (strcmp(argv[i], "--lan") == 0)
                 want_lan = 1;
+            else if (strcmp(argv[i], "--help") == 0) {
+                printf("%s\n\n%s\n", USAGE,
+                       "  --lan    bind this Mac's en0 IPv4 instead of 127.0.0.1, so\n"
+                       "           peers on the LAN can reach it. Exits if en0 has no\n"
+                       "           address rather than quietly serving loopback.\n"
+                       "  --help   this message\n\n"
+                       "shared_dir defaults to config.json shared_dir, port to\n"
+                       "peer.port. Without --lan the server binds 127.0.0.1.");
+                return 0;
+            } else
+                sl_push(&unknown, xstrdup(argv[i]));
         } else if (npos < 2) {
             positional[npos++] = argv[i];
         }
     }
+    if (unknown.count > 0)
+        die_unknown_flags(&unknown, USAGE);
+    sl_free(&unknown);
 
     const char *shared_dir = positional[0] != NULL ? positional[0]
                              : cfg->shared_dir  != NULL ? cfg->shared_dir
