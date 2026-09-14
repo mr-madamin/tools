@@ -398,9 +398,18 @@ int recv_file_body(int fd, const char *dest_dir, const json_value *header,
     }
     free(full_path);
 
-    int dst = open(safe, O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    /* Land the bytes beside the target, then rename into place. Writing the
+       destination directly with O_TRUNC destroys the existing copy the instant
+       the transfer starts, so a peer that dies mid-file leaves a truncated file
+       where a good one used to be. rename() is atomic within a filesystem, and
+       the temp sits in the same directory precisely to guarantee that. */
+    char *tmp = xmalloc(strlen(safe) + 32);
+    sprintf(tmp, "%s.%d.tmp", safe, (int)getpid());
+
+    int dst = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (dst < 0)
     {
+        free(tmp);
         free(safe);
         return BODY_IO;
     }
@@ -416,6 +425,8 @@ int recv_file_body(int fd, const char *dest_dir, const json_value *header,
         if (n == 0)
         { /* peer closed mid-file — truncated transfer */
             close(dst);
+            unlink(tmp);
+            free(tmp);
             free(safe);
             return BODY_IO;
         }
@@ -425,12 +436,16 @@ int recv_file_body(int fd, const char *dest_dir, const json_value *header,
                 continue;
             int stalled = is_timeout(errno);
             close(dst);
+            unlink(tmp);
+            free(tmp);
             free(safe);
             return stalled ? BODY_TIMEOUT : BODY_IO;
         }
         if (write(dst, buf, (size_t)n) != n)
         {
             close(dst);
+            unlink(tmp);
+            free(tmp);
             free(safe);
             return BODY_IO;
         }
@@ -438,10 +453,22 @@ int recv_file_body(int fd, const char *dest_dir, const json_value *header,
     }
     close(dst);
 
+    /* Stamp the mtime before the rename, so the file is never briefly visible
+       at its final path with the wrong timestamp (which the diff would read as
+       "changed" and resend). */
     struct timeval times[2];
     times[0].tv_sec = times[1].tv_sec = (time_t)mtime;
     times[0].tv_usec = times[1].tv_usec = (suseconds_t)((mtime - floor(mtime)) * 1e6);
-    utimes(safe, times);
+    utimes(tmp, times);
+
+    if (rename(tmp, safe) != 0)
+    {
+        unlink(tmp);
+        free(tmp);
+        free(safe);
+        return BODY_IO;
+    }
+    free(tmp);
     free(safe);
 
     *rel_out = xstrdup(rel_path);

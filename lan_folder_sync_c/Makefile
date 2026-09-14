@@ -8,7 +8,7 @@ LIB_OBJ := $(LIB_SRC:%.c=$(BIN)/%.o)
 
 PROGS   := sync_server sync_push file_sender file_receiver
 TESTS   := hello_test bad_frame_test dry_run_test delete_test nasty_test \
-           truncate_test
+           truncate_test atomic_test
 
 all: $(PROGS:%=$(BIN)/%)
 

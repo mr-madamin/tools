@@ -190,6 +190,24 @@ Same guarantees as the Python version, plus one:
   **`send_file` in `framing.py` has the same desync** — the fifth thing worth
   porting back.
 
+- **An interrupted PUT can't damage the file it was replacing.** The receiver
+  writes the body to `<target>.<pid>.tmp` in the same directory and `rename()`s
+  it into place — atomic within a filesystem, which is exactly why the temp is a
+  sibling rather than somewhere in `/tmp`. Opening the destination directly with
+  `O_TRUNC` destroys the good copy the instant the transfer begins: aborting a
+  5 MB PUT after 100 KB turned a 26-byte file into 102,400 bytes of padding.
+  Now the old copy stays until the new one is whole, and every failure path
+  removes the temp. The mtime is stamped before the rename, so the file is never
+  briefly visible with the wrong timestamp (which the next diff would read as
+  "changed" and resend). `atomic_test` covers it. **`recv_file_body` in
+  `framing.py` writes the destination directly** — the sixth thing worth
+  porting back.
+
+  This buys atomic *visibility*, not durability: there's no `fsync` before the
+  rename, so a power cut can still lose a just-written file. That's a different
+  failure, and paying an fsync per file to close it isn't obviously worth it
+  for a LAN folder sync.
+
   **This is the main deliberate behaviour difference.** `sync_server.py` runs its
   confinement guard on `DELETE` only; `recv_file_body` joins the incoming path
   onto `shared_dir` and writes it unchecked, so a hand-crafted `PUT` with
