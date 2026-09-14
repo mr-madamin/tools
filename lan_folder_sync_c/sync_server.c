@@ -183,9 +183,14 @@ static void serve_session(int conn, const char *shared_dir, const char *token)
     for (;;) {
         char *payload = NULL;
         size_t len = 0;
-        int rc = recv_msg(conn, &payload, &len);
+        /* Everything a client sends us is a short header; the big frame in this
+           protocol only ever travels the other way. */
+        int rc = recv_msg_max(conn, &payload, &len, MAX_CONTROL_FRAME);
         if (rc != FRAME_OK) {
-            if (rc == FRAME_TIMEOUT)
+            if (rc == FRAME_TOOBIG) {
+                printf("Refused oversized frame (cap %u bytes)\n", MAX_CONTROL_FRAME);
+                send_error(conn, "frame too large");
+            } else if (rc == FRAME_TIMEOUT)
                 printf("Session timed out: peer idle for %ds, dropping it\n",
                        SESSION_TIMEOUT);
             else if (rc == FRAME_ERR)

@@ -117,7 +117,7 @@ int send_error(int fd, const char *message)
     return rc;
 }
 
-int recv_msg(int fd, char **out, size_t *out_len)
+int recv_msg_max(int fd, char **out, size_t *out_len, size_t max)
 {
     unsigned char header[4];
     int rc = recv_exactly(fd, header, 4);
@@ -126,6 +126,11 @@ int recv_msg(int fd, char **out, size_t *out_len)
 
     size_t len = ((size_t)header[0] << 24) | ((size_t)header[1] << 16) |
                  ((size_t)header[2] << 8) | (size_t)header[3];
+
+    /* Refuse before allocating. xmalloc dies on failure, so without this an
+       unauthenticated peer could kill the process with four bytes. */
+    if (len > max)
+        return FRAME_TOOBIG;
 
     char *buf = xmalloc(len + 1);
     if (len > 0)
@@ -143,6 +148,11 @@ int recv_msg(int fd, char **out, size_t *out_len)
     if (out_len != NULL)
         *out_len = len;
     return FRAME_OK;
+}
+
+int recv_msg(int fd, char **out, size_t *out_len)
+{
+    return recv_msg_max(fd, out, out_len, MAX_FRAME);
 }
 
 /* ---- files ---------------------------------------------------------------- */
@@ -406,7 +416,7 @@ int recv_file(int fd, const char *dest_dir, char **rel_out)
 {
     char *payload = NULL;
     size_t len = 0;
-    int rc = recv_msg(fd, &payload, &len);
+    int rc = recv_msg_max(fd, &payload, &len, MAX_CONTROL_FRAME);
     if (rc != FRAME_OK)
         return rc;
 
@@ -435,7 +445,7 @@ int handshake(int fd, const char *token, json_value **reply)
 
     char *payload = NULL;
     size_t len = 0;
-    rc = recv_msg(fd, &payload, &len);
+    rc = recv_msg_max(fd, &payload, &len, MAX_CONTROL_FRAME); /* OK or ERROR */
     if (rc != FRAME_OK)
         return rc;
 

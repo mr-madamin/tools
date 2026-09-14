@@ -17,6 +17,15 @@
 #define FRAME_EOF     0
 #define FRAME_ERR    (-1)
 #define FRAME_TIMEOUT (-2)
+#define FRAME_TOOBIG  (-3) /* peer declared a frame bigger than we'll allocate */
+
+/* The length prefix is 4 bytes, so a peer can claim up to 4 GB before sending a
+   single byte of payload — and the old code malloc'd it on the spot, before any
+   authentication. Two ceilings, because the two directions carry very different
+   frames: a MANIFEST lists every file in the folder, while everything else is a
+   short header. The server only ever reads the short kind. */
+#define MAX_FRAME         (64u * 1024 * 1024) /* a manifest of a huge folder */
+#define MAX_CONTROL_FRAME (1u * 1024 * 1024)  /* HELLO / PUT / DELETE / BYE */
 
 /* Bound every later blocking recv/send on this socket. Python spells the whole
    of this sock.settimeout(); 0 seconds clears it. */
@@ -29,8 +38,11 @@ int send_msg(int fd, const void *payload, size_t len);
 int send_json(int fd, const char *json); /* send_msg over a NUL-terminated string */
 int send_error(int fd, const char *message);
 
-/* On FRAME_OK the caller owns *out (NUL-terminated; *out_len excludes it). */
-int recv_msg(int fd, char **out, size_t *out_len);
+/* On FRAME_OK the caller owns *out (NUL-terminated; *out_len excludes it).
+   FRAME_TOOBIG leaves the payload unread, so the stream has no boundary left to
+   resync on — every caller must end the session. */
+int recv_msg(int fd, char **out, size_t *out_len); /* capped at MAX_FRAME */
+int recv_msg_max(int fd, char **out, size_t *out_len, size_t max);
 
 int send_file(int fd, const char *root_dir, const char *rel_path);
 int send_delete(int fd, const char *rel_path);

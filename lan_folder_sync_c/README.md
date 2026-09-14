@@ -159,6 +159,24 @@ Same guarantees as the Python version, plus one:
   out everyone else until the process was killed. **`sync_server.py` still has
   that wedge** — it has no timeouts at all. The third thing worth porting back.
 
+- **A frame is refused on its length prefix alone.** Those 4 bytes can claim up
+  to 4 GB, and the C code used to `malloc` that on the spot — before reading any
+  payload, and before the HELLO, so an unauthenticated peer could try to exhaust
+  memory with four bytes and kill the process (`xmalloc` dies on failure).
+  There are two ceilings, because the two directions
+  carry different frames: `MAX_CONTROL_FRAME` (1 MB) for everything a client
+  sends, and `MAX_FRAME` (64 MB) for the MANIFEST reply, which lists every file
+  in the folder and is legitimately large — a 15,000-file folder already
+  produces ~1 MB. Over the cap the server answers `ERROR: frame too large` and
+  ends the session; it can't resync a stream whose payload it never read.
+  `bad_frame_test` covers this pre-auth.
+
+  `framing.py` has no cap either, but it's a milder bug there: its
+  `recv_exactly` appends chunks as they arrive instead of preallocating, so a
+  claimed length costs nothing until the attacker actually sends the bytes. No
+  four-byte amplification, and no `die()` on a failed allocation. Worth capping
+  for the same reason, but it isn't the same severity.
+
   **This is the main deliberate behaviour difference.** `sync_server.py` runs its
   confinement guard on `DELETE` only; `recv_file_body` joins the incoming path
   onto `shared_dir` and writes it unchecked, so a hand-crafted `PUT` with

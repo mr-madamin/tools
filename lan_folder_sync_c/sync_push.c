@@ -265,9 +265,13 @@ int main(int argc, char **argv)
 
     char *payload = NULL;
     size_t len = 0;
-    rc = recv_msg(sock, &payload, &len);
+    rc = recv_msg(sock, &payload, &len); /* the manifest: MAX_FRAME, not control */
     if (rc == FRAME_TIMEOUT)
         die("%s", silent_peer_help(host, port, "MANIFEST"));
+    if (rc == FRAME_TOOBIG)
+        die("peer's manifest frame exceeds %u bytes -- refusing to allocate it.\n"
+            "That's not a folder listing; check what's actually on %s:%d.",
+            MAX_FRAME, host, port);
     if (rc != FRAME_OK)
         die("Connection closed by peer before manifest was received");
 

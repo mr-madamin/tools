@@ -34,11 +34,30 @@ int main(void)
     /* --- Case 4: PUT header missing size/mtime --- */
     expect_error("put-missing-fields", "{\"op\": \"PUT\", \"path\": \"x\"}");
 
+    /* --- Case 5: a 4-byte length prefix claiming 4 GB, sent BEFORE the HELLO.
+       The server must refuse on the header alone: allocating first would let an
+       unauthenticated peer exhaust memory (and xmalloc dies) with four bytes. */
+    {
+        int s = dial_test_server(); /* deliberately NOT authenticated */
+        unsigned char huge[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
+        CHECK(send_all(s, huge, 4) == 0, "oversized-frame: send failed");
+
+        json_value *msg = recv_json_frame(s);
+        CHECK(msg != NULL, "oversized-frame: server closed without an ERROR");
+        const char *op = json_get_str(msg, "op");
+        CHECK(op != NULL && strcmp(op, "ERROR") == 0,
+              "oversized-frame: expected ERROR, not a 4 GB allocation");
+        ok("oversized-frame: refused pre-auth \xe2\x86\x92 '%s'",
+           json_get_str(msg, "message"));
+        json_free(msg);
+        close(s);
+    }
+
     /* --- The real pass condition: still alive, still speaking the protocol --- */
     int s = connect_authed();
     send_json(s, "{\"op\": \"MANIFEST\"}");
     json_value *msg = recv_json_frame(s);
-    CHECK(msg != NULL, "server died — no reply after four bad frames");
+    CHECK(msg != NULL, "server died — no reply after five bad frames");
     const char *op = json_get_str(msg, "op");
     CHECK(op != NULL && strcmp(op, "MANIFEST") == 0, "expected MANIFEST");
 
