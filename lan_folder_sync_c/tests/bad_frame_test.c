@@ -53,6 +53,45 @@ int main(void)
         close(s);
     }
 
+    /* --- Case 6: deeply nested JSON, again BEFORE the HELLO. Every '[' costs a
+       stack frame in a recursive-descent parser, and the header is parsed before
+       any authentication — 200 KB of them used to walk a release build off the
+       end of its stack and kill the process. The parser must refuse by depth. */
+    {
+        int s = dial_test_server(); /* deliberately NOT authenticated */
+        size_t n = 200000;
+        char *deep = xmalloc(n);
+        memset(deep, '[', n);
+        CHECK(send_msg(s, deep, n) == 0, "deep-nesting: send failed");
+        free(deep);
+
+        json_value *msg = recv_json_frame(s);
+        CHECK(msg != NULL,
+              "deep-nesting: no ERROR came back — the server crashed on nesting");
+        const char *op = json_get_str(msg, "op");
+        CHECK(op != NULL && strcmp(op, "ERROR") == 0, "deep-nesting: expected ERROR");
+        ok("deep-nesting: refused pre-auth without crashing");
+        json_free(msg);
+        close(s);
+    }
+
+    /* The limit has to reject the abusive case without rejecting real data:
+       a manifest nests three deep, so anything sane must still parse. */
+    {
+        char shallow[256];
+        int at = 0;
+        for (int i = 0; i < 20; i++)
+            at += snprintf(shallow + at, sizeof(shallow) - at, "[");
+        at += snprintf(shallow + at, sizeof(shallow) - at, "1");
+        for (int i = 0; i < 20; i++)
+            at += snprintf(shallow + at, sizeof(shallow) - at, "]");
+
+        json_value *v = json_parse(shallow, strlen(shallow));
+        CHECK(v != NULL, "20-deep nesting was rejected — the limit is too tight");
+        json_free(v);
+        ok("legitimate nesting (20 deep) still parses");
+    }
+
     /* --- The real pass condition: still alive, still speaking the protocol --- */
     int s = connect_authed();
     send_json(s, "{\"op\": \"MANIFEST\"}");

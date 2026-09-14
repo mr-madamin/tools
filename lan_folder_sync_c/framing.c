@@ -403,8 +403,9 @@ int recv_file_body(int fd, const char *dest_dir, const json_value *header,
        the transfer starts, so a peer that dies mid-file leaves a truncated file
        where a good one used to be. rename() is atomic within a filesystem, and
        the temp sits in the same directory precisely to guarantee that. */
-    char *tmp = xmalloc(strlen(safe) + 32);
-    sprintf(tmp, "%s.%d.tmp", safe, (int)getpid());
+    size_t tmp_cap = strlen(safe) + 32;
+    char *tmp = xmalloc(tmp_cap);
+    snprintf(tmp, tmp_cap, "%s.%d.tmp", safe, (int)getpid());
 
     int dst = open(tmp, O_WRONLY | O_CREAT | O_TRUNC, 0666);
     if (dst < 0)
@@ -660,8 +661,12 @@ void diff_manifests(const manifest *local, const manifest *remote, double tolera
     manifest l = *local, r = *remote;
     manifest_entry *ls = xmalloc(l.count * sizeof(*ls) + 1);
     manifest_entry *rs = xmalloc(r.count * sizeof(*rs) + 1);
-    memcpy(ls, l.items, l.count * sizeof(*ls));
-    memcpy(rs, r.items, r.count * sizeof(*rs));
+    /* An empty manifest has items == NULL, and memcpy(dst, NULL, 0) is UB even
+       though every real libc shrugs at it — so don't call it. */
+    if (l.count > 0)
+        memcpy(ls, l.items, l.count * sizeof(*ls));
+    if (r.count > 0)
+        memcpy(rs, r.items, r.count * sizeof(*rs));
     qsort(ls, l.count, sizeof(*ls), by_path);
     qsort(rs, r.count, sizeof(*rs), by_path);
 

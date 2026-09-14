@@ -3,9 +3,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Every '[' or '{' costs a C stack frame, and the payload is attacker-supplied
+   and parsed BEFORE the HELLO — so 200 KB of '[' was enough to walk a release
+   build off the end of its stack and kill the server. Python raises
+   RecursionError at its own limit; this is that limit. Real payloads here nest
+   two deep ({"files": {"path": {...}}}), so 64 is far past anything legitimate. */
+#define MAX_DEPTH 64
+
 typedef struct {
     const char *p;
     const char *end;
+    int depth;
 } parser;
 
 static json_value *parse_value(parser *ps);
@@ -259,9 +267,17 @@ static json_value *parse_value(parser *ps)
     skip_ws(ps);
     int c = peek(ps);
 
+    /* The only two recursive branches; guard them both in one place. */
+    if (c == '{' || c == '[') {
+        if (ps->depth >= MAX_DEPTH)
+            return NULL;
+        ps->depth++;
+        json_value *v = (c == '{') ? parse_object(ps) : parse_array(ps);
+        ps->depth--;
+        return v;
+    }
+
     switch (c) {
-    case '{': return parse_object(ps);
-    case '[': return parse_array(ps);
     case '"': {
         char *s = parse_string_raw(ps);
         if (s == NULL)
@@ -288,7 +304,7 @@ static json_value *parse_value(parser *ps)
 
 json_value *json_parse(const char *text, size_t len)
 {
-    parser ps = { text, text + len };
+    parser ps = { text, text + len, 0 };
     json_value *v = parse_value(&ps);
     if (v == NULL)
         return NULL;

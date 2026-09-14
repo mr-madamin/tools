@@ -208,6 +208,23 @@ Same guarantees as the Python version, plus one:
   failure, and paying an fsync per file to close it isn't obviously worth it
   for a LAN folder sync.
 
+- **Nested JSON is bounded.** `json.c` is a recursive-descent parser, so every
+  `[` or `{` costs a C stack frame — and the header is parsed *before* the
+  HELLO. 200 KB of `[`, from an unauthenticated peer and comfortably under the
+  frame cap, walked the release build off the end of its stack and killed the
+  server outright. Depth is now capped at 64, which is an order of magnitude
+  past anything real (a manifest nests three deep).
+
+  **`sync_server.py` dies on the same input.** Python's parser raises
+  `RecursionError` rather than smashing the stack, but the server catches only
+  `(UnicodeDecodeError, json.JSONDecodeError)` around `json.loads` and
+  `ConnectionError` around the session, so it escapes both and takes the
+  process down with a traceback. Same four-line fix on either side: bound the
+  depth, or catch the error. The seventh — and worst — thing worth porting
+  back, since it's an unauthenticated remote kill on both implementations.
+
+  Found by `make asan` and a few hundred malformed frames, not by reading.
+
   **This is the main deliberate behaviour difference.** `sync_server.py` runs its
   confinement guard on `DELETE` only; `recv_file_body` joins the incoming path
   onto `shared_dir` and writes it unchecked, so a hand-crafted `PUT` with
@@ -225,6 +242,18 @@ read from `sandbox/received`.
   binds the LAN IP *only*.
 
 ```
+make check    # starts a loopback server, runs every runner, tears it down
+make asan     # the same, rebuilt with AddressSanitizer + UBSan
+```
+
+`make check` is the one command that proves the tree. `make asan` builds into
+`bin-asan/` so it never mixes objects with the normal build; note that
+LeakSanitizer is unavailable on macOS, so it catches memory *errors* and
+undefined behaviour, not leaks.
+
+To drive the runners by hand instead:
+
+```
 mkdir -p sandbox/source sandbox/received
 make tests
 ./bin/sync_server            # loopback, in one terminal
@@ -233,6 +262,8 @@ make tests
 ./bin/dry_run_test
 ./bin/delete_test
 ./bin/nasty_test             # self-contained — needs no server
+./bin/truncate_test          # self-contained
+./bin/atomic_test
 ```
 
 ### Cross-checking against the Python implementation
