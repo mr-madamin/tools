@@ -1,5 +1,5 @@
-# build output
-bin/
+# build output — bin/ is the normal build, bin-asan/ the sanitizer one
+bin*/
 
 # runtime scratch — source (truth) + received (peer copy), regenerated every sync
 sandbox/
