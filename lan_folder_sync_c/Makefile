@@ -7,7 +7,8 @@ LIB_SRC := util.c json.c config.c framing.c
 LIB_OBJ := $(LIB_SRC:%.c=$(BIN)/%.o)
 
 PROGS   := sync_server sync_push file_sender file_receiver
-TESTS   := hello_test bad_frame_test dry_run_test delete_test nasty_test
+TESTS   := hello_test bad_frame_test dry_run_test delete_test nasty_test \
+           truncate_test
 
 all: $(PROGS:%=$(BIN)/%)
 

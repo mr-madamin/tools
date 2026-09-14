@@ -166,43 +166,58 @@ static double stat_mtime(const struct stat *st)
 #endif
 }
 
+/* The header declares `size`, and the body that follows is the only unframed
+   part of the stream — so the receiver finds the next frame by counting exactly
+   that many bytes. Send one byte too few or too many and it reads the next
+   header as file content: every later file in the session is silently corrupt.
+   The file can change underneath us at any point, so the declared size is the
+   contract, and this function honours it even when the file stops matching. */
 int send_file(int fd, const char *root_dir, const char *rel_path)
 {
     char *full_path = path_join(root_dir, rel_path);
 
-    struct stat st;
-    if (stat(full_path, &st) != 0)
-    {
-        free(full_path);
-        return -1;
-    }
-
-    strbuf meta;
-    sb_init(&meta);
-    sb_addstr(&meta, "{\"op\": \"PUT\", \"path\": ");
-    json_escape(&meta, rel_path);
-    sb_addf(&meta, ", \"size\": %lld, \"mtime\": %.6f}", (long long)st.st_size,
-            stat_mtime(&st));
-
-    int rc = send_msg(fd, meta.data, meta.len);
-    sb_free(&meta);
-    if (rc != 0)
-    {
-        free(full_path);
-        return rc; /* may be FRAME_TIMEOUT: the peer stopped reading */
-    }
-
+    /* Open first, then fstat the descriptor we actually hold: stat-then-open
+       would let the path be replaced in between, and we'd declare one file's
+       size while sending another's bytes. */
     int src = open(full_path, O_RDONLY);
     free(full_path);
     if (src < 0)
         return -1;
 
-    char buf[CHUNK];
-    for (;;)
+    struct stat st;
+    if (fstat(src, &st) != 0)
     {
-        ssize_t n = read(src, buf, sizeof(buf));
-        if (n == 0)
-            break;
+        close(src);
+        return -1;
+    }
+
+    long long size = (long long)st.st_size;
+
+    strbuf meta;
+    sb_init(&meta);
+    sb_addstr(&meta, "{\"op\": \"PUT\", \"path\": ");
+    json_escape(&meta, rel_path);
+    sb_addf(&meta, ", \"size\": %lld, \"mtime\": %.6f}", size, stat_mtime(&st));
+
+    int rc = send_msg(fd, meta.data, meta.len);
+    sb_free(&meta);
+    if (rc != 0)
+    {
+        close(src);
+        return rc; /* may be FRAME_TIMEOUT: the peer stopped reading */
+    }
+
+    char buf[CHUNK];
+    long long sent = 0;
+    int truncated = 0; /* the file shrank; we padded the rest */
+
+    while (sent < size)
+    {
+        size_t want = (size_t)(size - sent);
+        if (want > sizeof(buf))
+            want = sizeof(buf);
+
+        ssize_t n = read(src, buf, want);
         if (n < 0)
         {
             if (errno == EINTR)
@@ -210,15 +225,36 @@ int send_file(int fd, const char *root_dir, const char *rel_path)
             close(src);
             return -1;
         }
+        if (n == 0)
+        {
+            /* Short file: it was truncated mid-transfer. We already promised
+               `size` bytes, so pad — aborting here would leave the receiver
+               waiting for bytes that never come, and kill the whole session
+               over one file. The padded copy loses the mtime race on the next
+               push and gets resent, so this self-heals. */
+            memset(buf, 0, want);
+            n = (ssize_t)want;
+            truncated = 1;
+        }
+
         int src_rc = send_all(fd, buf, (size_t)n);
         if (src_rc != 0)
         {
             close(src);
             return src_rc;
         }
+        sent += n;
     }
+
+    /* If the file GREW we simply stop at `size` and never read the tail — the
+       frame is still exactly as long as advertised. */
+    int grew = 0;
+    struct stat after;
+    if (fstat(src, &after) == 0 && (long long)after.st_size != size)
+        grew = 1;
+
     close(src);
-    return 0;
+    return (truncated || grew) ? SEND_CHANGED : 0;
 }
 
 int send_delete(int fd, const char *rel_path)

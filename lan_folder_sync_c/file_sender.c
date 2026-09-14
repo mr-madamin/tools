@@ -30,8 +30,12 @@ int main(int argc, char **argv)
     if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) != 0)
         die("connect: %s", strerror(errno));
 
-    if (send_file(sock, ".", path) != 0)
+    int rc = send_file(sock, ".", path);
+    if (rc < 0)
         die("send_file %s: %s", path, strerror(errno));
+    if (rc == SEND_CHANGED)
+        printf("  ! %s changed while being sent; the copy is padded or clipped\n",
+               path);
     printf("Sent %s\n", path);
 
     close(sock);

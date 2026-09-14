@@ -177,6 +177,19 @@ Same guarantees as the Python version, plus one:
   four-byte amplification, and no `die()` on a failed allocation. Worth capping
   for the same reason, but it isn't the same severity.
 
+- **A file that changes while it's being sent can't corrupt the files after
+  it.** `send_file` opens the file and `fstat`s *that descriptor* (rather than
+  `stat`-then-`open`, which lets the path be swapped in between), then writes
+  exactly the number of body bytes it announced — padding if the file was
+  truncated, stopping early if it grew. That matters because the body is the
+  only unframed part of the stream: one byte off and the receiver reads the next
+  header as file content, silently corrupting every later file in the session.
+  The push reports `SEND_CHANGED` as a warning and keeps going, since the stream
+  is still intact and the affected file loses the mtime comparison next time and
+  gets resent. `truncate_test` pins this down without needing a server.
+  **`send_file` in `framing.py` has the same desync** — the fifth thing worth
+  porting back.
+
   **This is the main deliberate behaviour difference.** `sync_server.py` runs its
   confinement guard on `DELETE` only; `recv_file_body` joins the incoming path
   onto `shared_dir` and writes it unchecked, so a hand-crafted `PUT` with

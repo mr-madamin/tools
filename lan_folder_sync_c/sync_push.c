@@ -314,6 +314,12 @@ int main(int argc, char **argv)
         if (dry_run)
             continue;
         int put = send_file(sock, root_dir, to_put.items[i]);
+        if (put == SEND_CHANGED) {
+            hint("%s changed while it was being sent -- the copy on the peer is",
+                 to_put.items[i]);
+            hint("padded or clipped to the size we announced. Re-run to fix it.");
+            continue; /* the stream is still in sync; keep going */
+        }
         if (put == FRAME_TIMEOUT)
             die("stalled for %ds while sending '%s'.\n"
                 "The peer stopped reading -- server killed, or the Wi-Fi dropped.",

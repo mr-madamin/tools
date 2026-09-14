@@ -44,6 +44,12 @@ int send_error(int fd, const char *message);
 int recv_msg(int fd, char **out, size_t *out_len); /* capped at MAX_FRAME */
 int recv_msg_max(int fd, char **out, size_t *out_len, size_t max);
 
+/* 0 on success, -1 / FRAME_TIMEOUT on failure, or SEND_CHANGED when the file
+   changed size while we were reading it. SEND_CHANGED is a warning, not an
+   error: exactly `size` body bytes still went out, so the stream is intact and
+   the session can continue — only that one file's content is suspect. */
+#define SEND_CHANGED 1
+
 int send_file(int fd, const char *root_dir, const char *rel_path);
 int send_delete(int fd, const char *rel_path);
 
