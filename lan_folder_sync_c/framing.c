@@ -371,6 +371,20 @@ int recv_file_body(int fd, const char *dest_dir, const json_value *header,
         return BODY_MISSING;
     }
 
+    /* isfinite() rejects both inf and NaN, which are what a JSON "1e999" and a
+       bare "nan" decode to. Do this BEFORE the cast: once the cast happens the
+       damage (undefined behaviour) is already done. */
+    if (!isfinite(size_d) || size_d < 0 || size_d > (double)MAX_FILE_SIZE)
+    {
+        *missing = "size";
+        return BODY_BADNUM;
+    }
+    if (!isfinite(mtime) || mtime < -MAX_MTIME || mtime > MAX_MTIME)
+    {
+        *missing = "mtime";
+        return BODY_BADNUM;
+    }
+
     long long size = (long long)size_d;
 
     /* Check the path before creating anything: mkdir_p on "../evil/x" would

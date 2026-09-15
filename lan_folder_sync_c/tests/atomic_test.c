@@ -104,6 +104,37 @@ int main(void)
           "an aborted PUT left a .tmp file behind in %s", PEER_DIR);
     ok("no stray .tmp left in the shared folder");
 
+    /* --- a negative size must not blank the file either. It used to: the
+       write loop never ran, and the empty temp was renamed over the original
+       while the server logged "received" as if all was well. --- */
+    {
+        int s2 = connect_authed();
+        strbuf h;
+        sb_init(&h);
+        sb_addstr(&h, "{\"op\": \"PUT\", \"path\": ");
+        json_escape(&h, probe);
+        sb_addstr(&h, ", \"size\": -1, \"mtime\": 0}");
+        CHECK(send_msg(s2, h.data, h.len) == 0, "could not send the -1 PUT");
+        sb_free(&h);
+
+        json_value *reply = recv_json_frame(s2);
+        close(s2);
+        CHECK(reply != NULL, "server accepted a negative size without an ERROR");
+        const char *rop = json_get_str(reply, "op");
+        CHECK(rop != NULL && strcmp(rop, "ERROR") == 0,
+              "expected ERROR for a negative size");
+        json_free(reply);
+
+        size_t l2 = 0;
+        char *after = read_whole(probe_path, &l2);
+        CHECK(after != NULL, "%s vanished after the negative-size PUT", probe);
+        CHECK(l2 == strlen(GOOD_TEXT),
+              "%s is %zu bytes, was %zu — a negative size truncated it", probe,
+              l2, strlen(GOOD_TEXT));
+        free(after);
+        ok("a negative size was refused and left the file intact");
+    }
+
     /* --- and the server is still serving --- */
     s = connect_authed();
     send_json(s, "{\"op\": \"MANIFEST\"}");

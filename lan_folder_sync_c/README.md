@@ -208,6 +208,25 @@ Same guarantees as the Python version, plus one:
   failure, and paying an fsync per file to close it isn't obviously worth it
   for a LAN folder sync.
 
+- **The numbers in a PUT header are validated before they're used.** `size` and
+  `mtime` arrive as JSON doubles and were cast straight to `long long` and
+  `time_t`. A double outside the target's range makes that cast *undefined* —
+  `"size": 1e999` is a one-line frame, and UBSan reports `inf is outside the
+  range of representable values of type 'long long'`. Worse in practice,
+  `"size": -1` skipped the write loop entirely and renamed an empty temp over
+  the destination, blanking a real file while the log said `received`:
+
+  ```
+  before: 23 bytes -> 'IMPORTANT REAL CONTENT'
+  after:   0 bytes -> ''
+  ```
+
+  Both are now rejected with `ERROR: PUT header has an out-of-range 'size'`
+  before anything is cast, opened or written. `size` must be finite and within
+  `0 .. MAX_FILE_SIZE` (64 GiB, which also stops a peer from claiming a file
+  large enough to fill the disk); `mtime` must be finite and sane. Covered by
+  `bad_frame_test` and `atomic_test`.
+
 - **A source listing that isn't complete can't drive deletions.** `walk()`
   skips whatever it can't read — a directory without permission, or a path past
   `PATH_MAX` — and those entries used to vanish without a trace: the recursive

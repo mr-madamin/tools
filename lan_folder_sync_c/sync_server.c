@@ -266,6 +266,14 @@ static void serve_session(int conn, const char *shared_dir, const char *token)
                 json_free(header);
                 break; /* body size unknown — can't resync the stream */
             }
+            if (body == BODY_BADNUM) {
+                char msg[128];
+                snprintf(msg, sizeof(msg),
+                         "PUT header has an out-of-range '%s'", missing);
+                send_error(conn, msg);
+                json_free(header);
+                break; /* body length is nonsense — can't find the next frame */
+            }
             if (body == BODY_UNSAFE) {
                 const char *bad = json_get_str(header, "path");
                 strbuf sb;

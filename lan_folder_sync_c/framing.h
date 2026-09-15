@@ -59,6 +59,15 @@ int send_delete(int fd, const char *rel_path);
 #define BODY_IO      (-2) /* peer closed mid-file, or a local write failed */
 #define BODY_UNSAFE  (-3) /* path would escape dest_dir */
 #define BODY_TIMEOUT (-4) /* peer went quiet mid-file without closing */
+#define BODY_BADNUM  (-5) /* size/mtime present, but not a usable number */
+
+/* size and mtime arrive as JSON doubles and were cast straight to long long /
+   time_t. A double outside the target's range makes that cast undefined —
+   "size": 1e999 is a one-line frame that UBSan flags outright — and a negative
+   size silently truncated the destination to zero while reporting success.
+   Bound both before anything is cast, opened or written. */
+#define MAX_FILE_SIZE (64LL * 1024 * 1024 * 1024) /* 64 GiB per file */
+#define MAX_MTIME     1e15                        /* far past any real clock */
 
 int recv_file_body(int fd, const char *dest_dir, const json_value *header,
                    char **rel_out, const char **missing);

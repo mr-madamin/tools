@@ -22,6 +22,11 @@
 #define TEST_HOST "127.0.0.1"
 #define TEST_PORT 8765
 
+/* A runner that blocks forever on a silent server is worse than one that
+   fails: `make check` hangs instead of reporting. Every test socket gets a
+   deadline, so "the server never answered" surfaces as a failed CHECK. */
+#define TEST_TIMEOUT 10
+
 static inline char *test_token(void)
 {
     static char *cached = NULL;
@@ -47,6 +52,7 @@ static inline int dial_test_server(void)
     CHECK(connect(s, (struct sockaddr *)&addr, sizeof(addr)) == 0,
           "no server on %s:%d (%s) — start bin/sync_server in another terminal",
           TEST_HOST, TEST_PORT, strerror(errno));
+    sock_set_timeout(s, TEST_TIMEOUT);
     return s;
 }
 

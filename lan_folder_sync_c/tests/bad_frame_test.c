@@ -34,6 +34,16 @@ int main(void)
     /* --- Case 4: PUT header missing size/mtime --- */
     expect_error("put-missing-fields", "{\"op\": \"PUT\", \"path\": \"x\"}");
 
+    /* --- Cases 4b-4d: numeric fields that are present but unusable. These are
+       cast to long long / time_t, and a double outside the target range makes
+       that cast undefined behaviour — UBSan flags "size": 1e999 outright. --- */
+    expect_error("put-size-negative",
+                 "{\"op\": \"PUT\", \"path\": \"x\", \"size\": -1, \"mtime\": 0}");
+    expect_error("put-size-infinite",
+                 "{\"op\": \"PUT\", \"path\": \"x\", \"size\": 1e999, \"mtime\": 0}");
+    expect_error("put-mtime-infinite",
+                 "{\"op\": \"PUT\", \"path\": \"x\", \"size\": 0, \"mtime\": 1e999}");
+
     /* --- Case 5: a 4-byte length prefix claiming 4 GB, sent BEFORE the HELLO.
        The server must refuse on the header alone: allocating first would let an
        unauthenticated peer exhaust memory (and xmalloc dies) with four bytes. */
