@@ -232,7 +232,10 @@ static void serve_session(int conn, const char *shared_dir, const char *token)
 
         if (op != NULL && strcmp(op, "MANIFEST") == 0) {
             manifest m;
-            build_manifest(shared_dir, &m);
+            /* Partial here is far less dangerous than partial on the pusher —
+               files we fail to list just get re-sent, never deleted — but say
+               so, because it is the same underlying problem. */
+            int partial = build_manifest(shared_dir, &m) != 0;
             char *files = manifest_to_json(&m);
 
             strbuf sb;
@@ -244,7 +247,12 @@ static void serve_session(int conn, const char *shared_dir, const char *token)
             sb_free(&sb);
             free(files);
 
-            printf("Sent manifest (%zu files)\n", m.count);
+            if (partial)
+                printf("Sent manifest (%zu files) - WARNING: some directories "
+                       "under %s could not be read; the list is incomplete\n",
+                       m.count, shared_dir);
+            else
+                printf("Sent manifest (%zu files)\n", m.count);
             manifest_free(&m);
         } else if (op != NULL && strcmp(op, "PUT") == 0) {
             char *rel_path = NULL;

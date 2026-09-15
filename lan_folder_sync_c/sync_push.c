@@ -259,7 +259,7 @@ int main(int argc, char **argv)
     json_free(reply);
 
     manifest local;
-    build_manifest(root_dir, &local);
+    int local_partial = build_manifest(root_dir, &local) != 0;
 
     send_json(sock, "{\"op\": \"MANIFEST\"}");
 
@@ -295,6 +295,20 @@ int main(int argc, char **argv)
 
     /* An empty source is almost always a wrong path, not a real "delete
        everything" — refuse to mirror it. --dry-run still shows the plan. */
+    /* A directory we could not read is not the same as a directory with
+       nothing in it: the files are there, we just can't see them. Deleting on
+       the peer from a picture we know is incomplete is the empty-source wipe
+       wearing a different hat. */
+    if (local_partial) {
+        hint("could not read every directory under %s", root_dir);
+        hint("the file list above is INCOMPLETE -- anything unreadable is");
+        hint("missing from it (paths past PATH_MAX do this silently)");
+        if (delete_extras && !dry_run)
+            die("refusing to run --delete from a partial source listing: files\n"
+                "this scan could not see look identical to files you deleted,\n"
+                "and would be removed from the peer.");
+    }
+
     if (local.count == 0) {
         char *abs = path_abs(root_dir);
         hint("no files found under %s", abs);

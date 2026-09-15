@@ -557,6 +557,7 @@ static int walk(const char *full, strbuf *prefix, manifest *m)
 
     struct dirent *entry;
     size_t prefix_len = prefix->len;
+    int rc = 0; /* sticky: any unreadable subtree makes the whole walk partial */
 
     while ((entry = readdir(dir)) != NULL)
     {
@@ -568,6 +569,13 @@ static int walk(const char *full, strbuf *prefix, manifest *m)
         struct stat lst;
         if (lstat(child, &lst) != 0)
         {
+            /* ENOENT is a benign race: something was deleted while we walked,
+               and it genuinely isn't there any more. Anything else (a path past
+               PATH_MAX, a directory we lack permission to enter) means the
+               entry EXISTS and we simply cannot see it — which is exactly the
+               silent hole that made this listing look complete when it wasn't. */
+            if (errno != ENOENT)
+                rc = -1;
             free(child);
             continue;
         }
@@ -579,7 +587,11 @@ static int walk(const char *full, strbuf *prefix, manifest *m)
 
         if (S_ISDIR(lst.st_mode))
         {
-            walk(child, prefix, m);
+            /* Discarding this used to hide a whole missing subtree: past
+               PATH_MAX opendir() fails, the recursion quietly unwound, and the
+               manifest came back short with nothing to say about it. */
+            if (walk(child, prefix, m) != 0)
+                rc = -1;
         }
         else if (S_ISLNK(lst.st_mode))
         {
@@ -600,7 +612,7 @@ static int walk(const char *full, strbuf *prefix, manifest *m)
 
     sb_truncate(prefix, prefix_len);
     closedir(dir);
-    return 0;
+    return rc;
 }
 
 int build_manifest(const char *root_dir, manifest *m)
@@ -610,7 +622,10 @@ int build_manifest(const char *root_dir, manifest *m)
     sb_init(&prefix);
     int rc = walk(root_dir, &prefix, m);
     sb_free(&prefix);
-    return rc; /* a missing root yields an empty manifest, as os.walk does */
+    /* 0 = the manifest describes the whole tree; -1 = at least one directory
+       could not be read, so it is a PARTIAL picture. Callers that delete based
+       on this difference must not treat the two the same. */
+    return rc;
 }
 
 char *manifest_to_json(const manifest *m)

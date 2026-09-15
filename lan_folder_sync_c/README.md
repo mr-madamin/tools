@@ -208,6 +208,28 @@ Same guarantees as the Python version, plus one:
   failure, and paying an fsync per file to close it isn't obviously worth it
   for a LAN folder sync.
 
+- **A source listing that isn't complete can't drive deletions.** `walk()`
+  skips whatever it can't read — a directory without permission, or a path past
+  `PATH_MAX` — and those entries used to vanish without a trace: the recursive
+  call's return value was discarded, and an `lstat` failure just `continue`d.
+  The manifest came back short and looked authoritative. To the diff, a file we
+  couldn't see is indistinguishable from a file you deleted, so `--delete`
+  removed it from the peer. One `chmod 000` on a subdirectory was enough to
+  delete its contents from the other machine while the originals sat there
+  untouched.
+
+  A partial walk is now reported and, on the pusher, refuses `--delete` — the
+  empty-source guard above, generalised: don't mirror a picture you know has
+  holes in it. `ENOENT` is exempt, since a file disappearing mid-walk really is
+  gone rather than hidden. `--dry-run` still previews, and a fully readable tree
+  is never flagged. `partial_test` covers it.
+
+  **`build_manifest` in `framing.py` has the same hole**, by a different route:
+  `os.walk` defaults to `onerror=None`, which swallows the error and walks on.
+  Verified — a `chmod 000` subdirectory drops out of the Python manifest too,
+  with no exception raised. It needs an `onerror=` callback. The eighth thing
+  worth porting back, and the one that quietly deletes your files.
+
 - **Nested JSON is bounded.** `json.c` is a recursive-descent parser, so every
   `[` or `{` costs a C stack frame — and the header is parsed *before* the
   HELLO. 200 KB of `[`, from an unauthenticated peer and comfortably under the
