@@ -118,9 +118,10 @@ int main(int argc, char **argv)
     const char *shared_dir = positional[0] != NULL ? positional[0]
                              : cfg->shared_dir  != NULL ? cfg->shared_dir
                                                         : "sandbox/received";
-    int port = positional[1] != NULL ? atoi(positional[1])
-               : cfg->peer_port != 0 ? cfg->peer_port
-                                     : 8765;
+    int port = positional[1] != NULL
+                   ? parse_port(positional[1], "port argument")
+                   : cfg->peer_port != 0 ? cfg->peer_port
+                                         : 8765;
 
     char *bind_host = NULL;
     if (want_lan) {

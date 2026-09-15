@@ -6,6 +6,8 @@
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <poll.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,9 +51,37 @@ static inline int dial_test_server(void)
     addr.sin_port = htons(TEST_PORT);
     inet_pton(AF_INET, TEST_HOST, &addr.sin_addr);
 
-    CHECK(connect(s, (struct sockaddr *)&addr, sizeof(addr)) == 0,
+    /* connect() ignores SO_RCVTIMEO, and the server's backlog is 1 — so against
+       a server already wedged in a session this blocked forever and took the
+       whole run with it. Same non-blocking + poll dance sync_push uses. */
+    int flags = fcntl(s, F_GETFL, 0);
+    fcntl(s, F_SETFL, flags | O_NONBLOCK);
+
+    int rc = connect(s, (struct sockaddr *)&addr, sizeof(addr));
+    if (rc != 0 && errno == EINPROGRESS) {
+        struct pollfd pfd;
+        pfd.fd = s;
+        pfd.events = POLLOUT;
+        int n;
+        do {
+            n = poll(&pfd, 1, TEST_TIMEOUT * 1000);
+        } while (n < 0 && errno == EINTR);
+        CHECK(n > 0, "connect to %s:%d did not complete within %ds — is the "
+                     "server wedged in another session?",
+              TEST_HOST, TEST_PORT, TEST_TIMEOUT);
+
+        int err = 0;
+        socklen_t elen = sizeof(err);
+        rc = (getsockopt(s, SOL_SOCKET, SO_ERROR, &err, &elen) == 0 && err == 0)
+                 ? 0
+                 : -1;
+        errno = err;
+    }
+    CHECK(rc == 0,
           "no server on %s:%d (%s) — start bin/sync_server in another terminal",
           TEST_HOST, TEST_PORT, strerror(errno));
+
+    fcntl(s, F_SETFL, flags); /* blocking again; the deadline is SO_RCVTIMEO now */
     sock_set_timeout(s, TEST_TIMEOUT);
     return s;
 }

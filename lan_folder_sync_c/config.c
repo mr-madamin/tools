@@ -87,8 +87,13 @@ config *load_config(const char *argv0)
         if (s != NULL)
             cfg->peer_host = xstrdup(s);
         double port;
-        if (json_get_num(peer, "port", &port))
+        if (json_get_num(peer, "port", &port)) {
+            /* Same range check as the command line; a JSON double also has to
+               survive the cast to int, so reject inf/NaN before it. */
+            if (!(port >= 1 && port <= 65535))
+                die("%s: peer.port must be 1-65535", path);
             cfg->peer_port = (int)port;
+        }
     }
 
     json_free(root);

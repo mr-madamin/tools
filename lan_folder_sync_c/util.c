@@ -150,8 +150,6 @@ static int by_string(const void *a, const void *b)
     return strcmp(*(const char *const *)a, *(const char *const *)b);
 }
 
-/* ---- paths ---------------------------------------------------------------- */
-
 _Noreturn void die_unknown_flags(strlist *unknown, const char *usage)
 {
     qsort(unknown->items, unknown->count, sizeof(*unknown->items), by_string);
@@ -169,6 +167,21 @@ _Noreturn void die_unknown_flags(strlist *unknown, const char *usage)
     }
     die("%s\n%s", sb.data, usage); /* sb leaks; we're on our way out */
 }
+
+int parse_port(const char *text, const char *where)
+{
+    errno = 0;
+    char *end = NULL;
+    long v = strtol(text, &end, 10);
+
+    if (end == text || *end != '\0')
+        die("%s: '%s' is not a number", where, text);
+    if (errno == ERANGE || v < 1 || v > 65535)
+        die("%s: port %s is outside 1-65535", where, text);
+    return (int)v;
+}
+
+/* ---- paths ---------------------------------------------------------------- */
 
 char *path_join(const char *a, const char *b)
 {

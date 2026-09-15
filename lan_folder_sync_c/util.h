@@ -46,6 +46,10 @@ void sl_free(strlist *sl);
    silently-ignored typo like --dryrun is how a preview becomes a real push. */
 _Noreturn void die_unknown_flags(strlist *unknown, const char *usage);
 
+/* A TCP port, or die explaining why not. atoi() silently returned 0 for "http"
+   and truncated anything over 65535, so a typo bound a port nobody meant. */
+int parse_port(const char *text, const char *where);
+
 /* ---- paths --------------------------------------------------------------- */
 
 char *path_join(const char *a, const char *b); /* os.path.join, roughly */

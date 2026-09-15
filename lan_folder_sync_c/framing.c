@@ -308,7 +308,11 @@ char *safe_path(const char *base, const char *rel_path)
     char *cur = xstrdup(base_real);
     char *rest = xstrdup(rel_path);
 
-    for (char *comp = strtok(rest, "/"); comp != NULL; comp = strtok(NULL, "/"))
+    /* strtok_r, not strtok: the latter keeps its cursor in a single static slot,
+       so two threads resolving paths at once would walk each other's string. */
+    char *save = NULL;
+    for (char *comp = strtok_r(rest, "/", &save); comp != NULL;
+         comp = strtok_r(NULL, "/", &save))
     {
         if (comp[0] == '\0' || strcmp(comp, ".") == 0)
             continue;

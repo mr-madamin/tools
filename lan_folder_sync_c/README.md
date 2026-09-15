@@ -249,6 +249,12 @@ Same guarantees as the Python version, plus one:
   with no exception raised. It needs an `onerror=` callback. The eighth thing
   worth porting back, and the one that quietly deletes your files.
 
+- **Smaller sharp edges.** `safe_path` uses `strtok_r` rather than `strtok`,
+  whose cursor lives in one static slot shared by every caller. Ports are parsed
+  with `strtol` and range-checked on both the command line and in `config.json`
+  — `atoi` returned 0 for `http` and truncated anything over 65535, so a typo
+  bound a port nobody meant, and the server looked like it had started fine.
+
 - **Nested JSON is bounded.** `json.c` is a recursive-descent parser, so every
   `[` or `{` costs a C stack frame — and the header is parsed *before* the
   HELLO. 200 KB of `[`, from an unauthenticated peer and comfortably under the
