@@ -204,9 +204,16 @@ static void serve_session(int conn, const char *shared_dir, const char *token)
             header = json_parse(payload, len);
         free(payload);
 
-        if (header == NULL || header->type != JSON_OBJECT) {
-            json_free(header);
+        if (header == NULL) {
             send_error(conn, "malformed header: not valid UTF-8 JSON");
+            break;
+        }
+        /* Valid JSON, but "123" or "[1,2]" is not a header. Worth its own
+           message: the parse succeeded, so blaming UTF-8 sends you hunting in
+           the wrong place. sync_server.py says the same words here. */
+        if (header->type != JSON_OBJECT) {
+            json_free(header);
+            send_error(conn, "malformed header: not a JSON object");
             break;
         }
 

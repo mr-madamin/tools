@@ -53,6 +53,20 @@ while True:
             except (UnicodeDecodeError, json.JSONDecodeError):
                 send_error(conn, "malformed header: not valid UTF-8 JSON")
                 break
+            except RecursionError:
+                # json's parser recurses per '[' or '{'. 200 KB of '[' exhausts
+                # the interpreter's stack BEFORE the HELLO, and RecursionError
+                # is neither a JSONDecodeError nor a ConnectionError, so it
+                # escaped both handlers and killed the whole server.
+                send_error(conn, "malformed header: nested too deeply")
+                break
+
+            # json.loads("123") is a perfectly valid int, and header.get() then
+            # raised AttributeError straight out of the accept loop — another
+            # unauthenticated four-byte kill. The header must be an object.
+            if not isinstance(header, dict):
+                send_error(conn, "malformed header: not a JSON object")
+                break
 
             op = header.get("op")
 
@@ -107,6 +121,12 @@ while True:
                 break  # unknown frame
     except ConnectionError as e:
         print(f"Session error: {e}")
+    except Exception as e:  # noqa: BLE001 - a session must never kill the server
+        # Last line of defence. One peer's bad frame is a session-level problem;
+        # before this, anything unanticipated propagated out of the accept loop
+        # and took the process with it. KeyboardInterrupt/SystemExit derive from
+        # BaseException, so Ctrl-C still stops the server.
+        print(f"Session error: {type(e).__name__}: {e}")
     finally:
         conn.close()
         print("Session ended, waiting for next peer")

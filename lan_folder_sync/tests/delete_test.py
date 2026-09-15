@@ -58,6 +58,15 @@ def plant_on_peer(name):
     return path
 
 
+# One real file in the source, so the push isn't "mirror an empty folder":
+# sync_push refuses --delete from an empty source, and rightly so.
+ANCHOR = f"_delete_anchor_{os.getpid()}.txt"
+ANCHOR_SRC = os.path.join(ROOT_DIR, ANCHOR)
+ANCHOR_PEER = os.path.join(PEER_DIR, ANCHOR)
+os.makedirs(ROOT_DIR, exist_ok=True)
+with open(ANCHOR_SRC, "w") as f:
+    f.write("anchor\n")
+
 try:
     section("DELETE behavior")
 
@@ -131,7 +140,8 @@ try:
     done("DELETE removes, previews safely, and refuses to escape received/ 🗑️")
 finally:
     nested = os.path.join(PEER_DIR, "sub", PROBE)
-    for p in (os.path.join(PEER_DIR, PROBE), nested, VICTIM_PATH):
+    for p in (os.path.join(PEER_DIR, PROBE), nested, VICTIM_PATH,
+              ANCHOR_SRC, ANCHOR_PEER):
         if os.path.exists(p):
             os.remove(p)
     sub = os.path.join(PEER_DIR, "sub")

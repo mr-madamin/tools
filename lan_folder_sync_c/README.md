@@ -262,15 +262,23 @@ Same guarantees as the Python version, plus one:
   server outright. Depth is now capped at 64, which is an order of magnitude
   past anything real (a manifest nests three deep).
 
-  **`sync_server.py` dies on the same input.** Python's parser raises
-  `RecursionError` rather than smashing the stack, but the server catches only
-  `(UnicodeDecodeError, json.JSONDecodeError)` around `json.loads` and
-  `ConnectionError` around the session, so it escapes both and takes the
-  process down with a traceback. Same four-line fix on either side: bound the
-  depth, or catch the error. The seventh — and worst — thing worth porting
-  back, since it's an unauthenticated remote kill on both implementations.
+  **`sync_server.py` died on the same input, and has now been fixed too.** Its
+  parser raises `RecursionError` rather than smashing the stack, but the server
+  caught only `(UnicodeDecodeError, json.JSONDecodeError)` around `json.loads`
+  and `ConnectionError` around the session, so it escaped both and took the
+  process down with a traceback. Fixing that turned up a *second*
+  unauthenticated kill in the same spot: `json.loads("123")` is a valid `int`,
+  and `header.get("op")` then raised `AttributeError` straight out of the accept
+  loop. A four-byte frame stopped the server. Both are refused now, and a
+  catch-all around the session means no future frame can kill the process
+  either — `KeyboardInterrupt` derives from `BaseException`, so Ctrl-C still
+  works.
 
   Found by `make asan` and a few hundred malformed frames, not by reading.
+
+  A header that parses but isn't an object now gets its own message —
+  `malformed header: not a JSON object` — on both sides. Blaming UTF-8 for
+  `123` sent you hunting in the wrong place.
 
   **This is the main deliberate behaviour difference.** `sync_server.py` runs its
   confinement guard on `DELETE` only; `recv_file_body` joins the incoming path
