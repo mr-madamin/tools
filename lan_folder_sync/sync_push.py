@@ -204,7 +204,8 @@ if reply.get("op") != "OK":
     sys.exit(f"handshake refused: {reply.get('message')}")
 print("  handshake ok (token accepted)")
 
-local = build_manifest(ROOT_DIR)
+walk_errors = []
+local = build_manifest(ROOT_DIR, walk_errors)
 
 send_msg(sock, json.dumps({"op": "MANIFEST"}).encode("utf-8"))
 try:
@@ -219,6 +220,20 @@ to_put, to_delete = diff_manifests(local, remote)
 
 label = "DRY RUN - no files will be sent\n" if dry_run else ""
 print(f"{label}Local: {len(local)} files | Peer: {len(remote)} files")
+
+# A directory we couldn't read is not a directory with nothing in it: the
+# files are there, we just can't see them. Deleting on the peer from a picture
+# we KNOW has holes is the empty-source wipe wearing a different hat.
+if walk_errors:
+    hint(f"could not read every directory under {ROOT_DIR}")
+    hint("the file list below is INCOMPLETE -- anything unreadable is missing")
+    hint(f"from it ({walk_errors[0]})")
+    if delete and not dry_run:
+        sys.exit(
+            "refusing to run --delete from a partial source listing: files this\n"
+            "scan could not see look identical to files you deleted, and would\n"
+            "be removed from the peer."
+        )
 
 if not local:
     hint(f"no files found under {os.path.abspath(ROOT_DIR)}")

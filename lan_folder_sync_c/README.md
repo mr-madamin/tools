@@ -249,11 +249,13 @@ Same guarantees as the Python version, plus one:
   gone rather than hidden. `--dry-run` still previews, and a fully readable tree
   is never flagged. `partial_test` covers it.
 
-  **`build_manifest` in `framing.py` has the same hole**, by a different route:
-  `os.walk` defaults to `onerror=None`, which swallows the error and walks on.
-  Verified — a `chmod 000` subdirectory drops out of the Python manifest too,
-  with no exception raised. It needs an `onerror=` callback. The eighth thing
-  worth porting back, and the one that quietly deletes your files.
+  **`build_manifest` in `framing.py` had the same hole by a different route,
+  and now carries the same guard.** `os.walk` defaults to `onerror=None`, which
+  swallows the error and walks on, and `os.stat` was called unguarded on top of
+  that. It takes an optional `errors` list now; `sync_push.py` passes one and
+  refuses `--delete` when it comes back non-empty, naming the directory it
+  couldn't read. Same `ENOENT` exemption, since a file that vanished mid-walk
+  really is gone.
 
 - **Smaller sharp edges.** `safe_path` uses `strtok_r` rather than `strtok`,
   whose cursor lives in one static slot shared by every caller. Ports are parsed

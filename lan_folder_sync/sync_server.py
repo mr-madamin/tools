@@ -91,12 +91,23 @@ while True:
                 continue
 
             if op == "MANIFEST":
-                manifest = build_manifest(SHARED_DIR)
+                # Partial here is far less dangerous than partial on the
+                # pusher - files we fail to list just get re-sent, never
+                # deleted - but say so, it's the same underlying problem.
+                walk_errors = []
+                manifest = build_manifest(SHARED_DIR, walk_errors)
                 reply = json.dumps({"op": "MANIFEST", "files": manifest}).encode(
                     "utf-8"
                 )
                 send_msg(conn, reply)
-                print(f"Sent manifest ({len(manifest)} files)")
+                if walk_errors:
+                    print(
+                        f"Sent manifest ({len(manifest)} files) - WARNING: some "
+                        f"directories under {SHARED_DIR} could not be read; "
+                        f"the list is incomplete"
+                    )
+                else:
+                    print(f"Sent manifest ({len(manifest)} files)")
             elif op == "PUT":
                 try:
                     rel_path = recv_file_body(conn, SHARED_DIR, header)

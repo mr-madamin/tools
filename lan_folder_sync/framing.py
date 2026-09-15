@@ -1,3 +1,4 @@
+import errno
 import json
 import math
 import os
@@ -177,16 +178,37 @@ def recv_file(conn, dest_dir):
     return recv_file_body(conn, dest_dir, header)
 
 
-def build_manifest(root_dir):
+def build_manifest(root_dir, errors=None):
     """Walk root_dir and return a manifest:
     { relative_path: {"size": int, "mtime": float}, ... }
-    keyed by each file's path *relative to root_dir*."""
+    keyed by each file's path *relative to root_dir*.
+
+    Pass `errors` (a list) to find out whether the walk was COMPLETE. os.walk
+    defaults to onerror=None, which silently swallows every directory it can't
+    read, and os.stat was called unguarded. Either way files vanish from the
+    manifest while it still looks authoritative — and to the diff, a file we
+    couldn't see is indistinguishable from one the user deleted, so --delete
+    removes it from the peer. A chmod 000 on a subdirectory was enough.
+    """
     manifest = {}
-    for dirpath, dirnames, filenames in os.walk(root_dir):
+
+    def on_error(exc):
+        if errors is not None:
+            errors.append(exc)
+
+    for dirpath, dirnames, filenames in os.walk(root_dir, onerror=on_error):
         for filename in filenames:
             full_path = os.path.join(dirpath, filename)
             rel_path = os.path.relpath(full_path, root_dir)
-            info = os.stat(full_path)
+            try:
+                info = os.stat(full_path)
+            except OSError as e:
+                # ENOENT is a benign race: it really is gone. Anything else (a
+                # path past PATH_MAX, a permissions hole) means the file EXISTS
+                # and we simply cannot see it.
+                if e.errno != errno.ENOENT and errors is not None:
+                    errors.append(e)
+                continue
             manifest[rel_path] = {"size": info.st_size, "mtime": info.st_mtime}
     return manifest
 
