@@ -4,7 +4,15 @@ import socket
 import sys
 
 from config import load_config
-from framing import build_manifest, recv_file_body, recv_msg, send_error, send_msg
+from framing import (
+    UnsafePath,
+    build_manifest,
+    recv_file_body,
+    recv_msg,
+    safe_path,
+    send_error,
+    send_msg,
+)
 from netutil import lan_ip
 
 cfg = load_config()
@@ -95,6 +103,9 @@ while True:
                 except KeyError as e:
                     send_error(conn, f"PUT header missing field: {e}")
                     break  # body size unknown - can't resync the stream
+                except UnsafePath as e:
+                    send_error(conn, f"unsafe path refused: {e}")
+                    break  # body still queued - the stream can't be resynced
                 except ValueError as e:
                     # size/mtime present but unusable (negative, inf, NaN).
                     # Same wording as the C server.
@@ -110,9 +121,11 @@ while True:
                     send_error(conn, "DELETE missing 'path'")
                     break
 
-                base = os.path.realpath(SHARED_DIR)
-                target = os.path.realpath(os.path.join(base, rel_path))
-                if target != base and not target.startswith(base + os.sep):
+                # One shared guard for PUT and DELETE. The old check here
+                # realpath'd the whole path, which also let a path resolving to
+                # the shared folder ITSELF through (target == base passed).
+                target = safe_path(SHARED_DIR, rel_path)
+                if target is None:
                     send_error(conn, f"unsafe path refused: {rel_path!r}")
                     break
 

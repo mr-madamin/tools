@@ -74,14 +74,70 @@ def _checked_number(header, field, low, high):
     return value
 
 
+class UnsafePath(Exception):
+    """A PUT or DELETE path that would land outside shared_dir."""
+
+
+def path_is_lexically_safe(rel_path):
+    """No absolute paths, no ".." component. Cheap, and runs before anything
+    touches the disk — os.makedirs on "../evil/x" would create directories
+    outside dest_dir before any resolution got a look in."""
+    if not rel_path or rel_path.startswith("/"):
+        return False
+    return ".." not in rel_path.split("/")
+
+
+def safe_path(base, rel_path):
+    """Resolve rel_path under base, or None if it would escape.
+
+    realpath() on the whole path is what the DELETE guard used to do, and it
+    only works because the file already exists. A PUT names a file that usually
+    does NOT exist yet, and realpath of a missing path resolves differently. So
+    walk the path a component at a time, resolve any symlink as we meet it, and
+    re-check containment each time — the one escape "..-free and relative"
+    still leaves open is a symlink pointing out of the tree.
+    """
+    base_real = os.path.realpath(base)
+    if not path_is_lexically_safe(rel_path):
+        return None
+
+    current = base_real
+    for comp in rel_path.split("/"):
+        if comp in ("", "."):
+            continue
+        nxt = os.path.join(current, comp)
+        if os.path.islink(nxt):
+            if not os.path.exists(nxt):
+                return None  # broken link - refuse it
+            nxt = os.path.realpath(nxt)
+        if nxt != base_real and not nxt.startswith(base_real + os.sep):
+            return None
+        current = nxt
+
+    if current == base_real:
+        return None  # the path named the root itself
+    return current
+
+
 def recv_file_body(conn, dest_dir, header):
     """Write the raw body that follows a PUT header. header already parsed."""
     rel_path = header["path"]
     size = int(_checked_number(header, "size", 0, MAX_FILE_SIZE))
     mtime = _checked_number(header, "mtime", -MAX_MTIME, MAX_MTIME)
 
+    # Check the path BEFORE creating anything: a hand-crafted "../../x" used to
+    # be joined onto dest_dir and written unchecked, giving any authenticated
+    # peer an arbitrary file write on the receiver.
+    if not path_is_lexically_safe(rel_path):
+        raise UnsafePath(repr(rel_path))
+
     full_path = os.path.join(dest_dir, rel_path)
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
+
+    # The parent exists now, so the symlink-aware guard can resolve it.
+    full_path = safe_path(dest_dir, rel_path)
+    if full_path is None:
+        raise UnsafePath(repr(rel_path))
 
     # Land the bytes beside the target, then rename. Opening full_path directly
     # truncates the existing copy the moment the transfer starts, so a peer that

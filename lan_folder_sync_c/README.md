@@ -286,11 +286,22 @@ Same guarantees as the Python version, plus one:
   `malformed header: not a JSON object` — on both sides. Blaming UTF-8 for
   `123` sent you hunting in the wrong place.
 
-  **This is the main deliberate behaviour difference.** `sync_server.py` runs its
-  confinement guard on `DELETE` only; `recv_file_body` joins the incoming path
-  onto `shared_dir` and writes it unchecked, so a hand-crafted `PUT` with
-  `"path": "../../x"` writes outside the shared folder on the Python receiver.
-  The C server refuses it. Worth porting back.
+  **This used to be the main deliberate behaviour difference, and no longer is.**
+  `sync_server.py` ran its confinement guard on `DELETE` only; `recv_file_body`
+  joined the incoming path onto `shared_dir` and wrote it unchecked, so an
+  authenticated peer had an arbitrary file write on the receiver — a `PUT` with
+  `"path": "../../ESCAPED.txt"` landed two directories outside the shared
+  folder, verified. `framing.py` now carries `path_is_lexically_safe` and
+  `safe_path`, the same two-stage guard as the C server: reject absolute paths
+  and `..` before `os.makedirs` can create anything, then resolve component by
+  component so a symlink pointing out of the tree is caught too.
+
+  `DELETE` now shares that implementation rather than keeping its own. The old
+  DELETE check `realpath`'d the whole path, which worked only because the file
+  already existed — a PUT names a file that usually doesn't — and its
+  `target != base and not target.startswith(base + os.sep)` let a path
+  resolving to the shared folder *itself* through. `safe_path` refuses that, as
+  C always did.
 
 ## 8. Running the tests (developers)
 
