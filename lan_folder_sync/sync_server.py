@@ -95,6 +95,11 @@ while True:
                 except KeyError as e:
                     send_error(conn, f"PUT header missing field: {e}")
                     break  # body size unknown - can't resync the stream
+                except ValueError as e:
+                    # size/mtime present but unusable (negative, inf, NaN).
+                    # Same wording as the C server.
+                    send_error(conn, f"PUT header has an out-of-range '{e}'")
+                    break  # body length is nonsense - can't find the next frame
                 print(f"    received {rel_path}")
             elif op == "BYE":
                 print("Peer said BYE")

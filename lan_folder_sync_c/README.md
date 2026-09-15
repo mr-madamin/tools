@@ -200,8 +200,9 @@ Same guarantees as the Python version, plus one:
   removes the temp. The mtime is stamped before the rename, so the file is never
   briefly visible with the wrong timestamp (which the next diff would read as
   "changed" and resend). `atomic_test` covers it. **`recv_file_body` in
-  `framing.py` writes the destination directly** — the sixth thing worth
-  porting back.
+  `framing.py` wrote the destination directly, and has now been fixed the same
+  way** — `os.replace()` onto a sibling temp, with the temp removed on every
+  failure path.
 
   This buys atomic *visibility*, not durability: there's no `fsync` before the
   rename, so a power cut can still lose a just-written file. That's a different
@@ -226,6 +227,11 @@ Same guarantees as the Python version, plus one:
   `0 .. MAX_FILE_SIZE` (64 GiB, which also stops a peer from claiming a file
   large enough to fill the disk); `mtime` must be finite and sane. Covered by
   `bad_frame_test` and `atomic_test`.
+
+  `framing.py` now carries the same two constants and the same check, wording
+  the refusal identically. Its version also has to exclude `bool`, which is a
+  subclass of `int` in Python — `"size": true` would otherwise pass an
+  `isinstance` test and then compare as 1.
 
 - **A source listing that isn't complete can't drive deletions.** `walk()`
   skips whatever it can't read — a directory without permission, or a path past

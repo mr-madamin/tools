@@ -1,6 +1,14 @@
 import json
+import math
 import os
 import struct
+
+# size and mtime arrive as JSON numbers from the peer and were used unchecked:
+# a negative size skipped the write loop and left an empty file where a real one
+# had been, while "size": 1e999 decodes to inf. Bound both. (The C port carries
+# the same two constants.)
+MAX_FILE_SIZE = 64 * 1024 * 1024 * 1024  # 64 GiB per file
+MAX_MTIME = 1e15  # far past any real clock
 
 
 def recv_exactly(conn, n):
@@ -55,25 +63,52 @@ def send_file(conn, root_dir, rel_path):
             conn.sendall(chunk)
 
 
+def _checked_number(header, field, low, high):
+    """A JSON number we can actually use, or ValueError naming the field."""
+    value = header[field]  # KeyError here means "missing", handled separately
+    # bool is a subclass of int, so `true` would sail through the isinstance.
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(field)
+    if not math.isfinite(value) or not low <= value <= high:
+        raise ValueError(field)
+    return value
+
+
 def recv_file_body(conn, dest_dir, header):
     """Write the raw body that follows a PUT header. header already parsed."""
     rel_path = header["path"]
-    size = header["size"]
-    mtime = header["mtime"]
+    size = int(_checked_number(header, "size", 0, MAX_FILE_SIZE))
+    mtime = _checked_number(header, "mtime", -MAX_MTIME, MAX_MTIME)
 
     full_path = os.path.join(dest_dir, rel_path)
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
 
-    bytes_received = 0
-    with open(full_path, "wb") as f:
-        while bytes_received < size:
-            chunk = conn.recv(min(65536, size - bytes_received))
-            if chunk == b"":
-                raise ConnectionError("peer closed mid-file - truncated transfer")
-            f.write(chunk)
-            bytes_received += len(chunk)
+    # Land the bytes beside the target, then rename. Opening full_path directly
+    # truncates the existing copy the moment the transfer starts, so a peer that
+    # dies mid-file leaves a stub where a good file used to be. os.replace is
+    # atomic within a filesystem, which is why the temp is a sibling.
+    tmp_path = f"{full_path}.{os.getpid()}.tmp"
+    try:
+        bytes_received = 0
+        with open(tmp_path, "wb") as f:
+            while bytes_received < size:
+                chunk = conn.recv(min(65536, size - bytes_received))
+                if chunk == b"":
+                    raise ConnectionError("peer closed mid-file - truncated transfer")
+                f.write(chunk)
+                bytes_received += len(chunk)
 
-    os.utime(full_path, (mtime, mtime))
+        # Stamp the mtime before the rename, so the file is never briefly
+        # visible at its final path with the wrong timestamp.
+        os.utime(tmp_path, (mtime, mtime))
+        os.replace(tmp_path, full_path)
+    except BaseException:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
+
     return rel_path
 
 
