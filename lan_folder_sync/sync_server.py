@@ -5,6 +5,8 @@ import sys
 
 from config import load_config
 from framing import (
+    MAX_CONTROL_FRAME,
+    FrameTooLarge,
     UnsafePath,
     build_manifest,
     recv_file_body,
@@ -14,6 +16,11 @@ from framing import (
     send_msg,
 )
 from netutil import lan_ip
+
+# Line-buffer stdout: redirected to a file or a service manager, Python
+# block-buffers and the log stays empty until the process exits. The C
+# port spells this setvbuf(stdout, NULL, _IOLBF, 0).
+sys.stdout.reconfigure(line_buffering=True)
 
 cfg = load_config()
 TOKEN = cfg["token"]
@@ -52,7 +59,14 @@ while True:
     authenticated = False
     try:
         while True:
-            header_bytes = recv_msg(conn)
+            # Everything a client sends us is a short header; the big frame
+            # in this protocol only ever travels the other way.
+            try:
+                header_bytes = recv_msg(conn, MAX_CONTROL_FRAME)
+            except FrameTooLarge as e:
+                print(f"Refused oversized frame ({e} bytes, cap {MAX_CONTROL_FRAME})")
+                send_error(conn, "frame too large")
+                break
             if header_bytes is None:
                 break  # peer vanished
 

@@ -171,11 +171,12 @@ Same guarantees as the Python version, plus one:
   ends the session; it can't resync a stream whose payload it never read.
   `bad_frame_test` covers this pre-auth.
 
-  `framing.py` has no cap either, but it's a milder bug there: its
+  `framing.py` had no cap either, though it was a milder bug there: its
   `recv_exactly` appends chunks as they arrive instead of preallocating, so a
-  claimed length costs nothing until the attacker actually sends the bytes. No
-  four-byte amplification, and no `die()` on a failed allocation. Worth capping
-  for the same reason, but it isn't the same severity.
+  claimed length cost nothing until the attacker actually sent the bytes — no
+  four-byte amplification, and no `die()` on a failed allocation. It now
+  carries the same two ceilings and raises `FrameTooLarge`, refusing with the
+  same `frame too large` message.
 
 - **A file that changes while it's being sent can't corrupt the files after
   it.** `send_file` opens the file and `fstat`s *that descriptor* (rather than
@@ -187,8 +188,13 @@ Same guarantees as the Python version, plus one:
   The push reports `SEND_CHANGED` as a warning and keeps going, since the stream
   is still intact and the affected file loses the mtime comparison next time and
   gets resent. `truncate_test` pins this down without needing a server.
-  **`send_file` in `framing.py` has the same desync** — the fifth thing worth
-  porting back.
+  **`send_file` in `framing.py` had the same desync, and now carries the same
+  contract.** Its version had both races: `os.path.getsize(full_path)` followed
+  by a separate `open(full_path)`, then a read-to-EOF loop with no length
+  agreement. Reproduced over a socketpair — declared 5,242,880 bytes, delivered
+  65,558, and the following frame never arrived. It now `os.fstat`s the open
+  handle and writes exactly the size it announced, returning True when the file
+  changed so the pusher can say so.
 
 - **An interrupted PUT can't damage the file it was replacing.** The receiver
   writes the body to `<target>.<pid>.tmp` in the same directory and `rename()`s
@@ -256,6 +262,13 @@ Same guarantees as the Python version, plus one:
   refuses `--delete` when it comes back non-empty, naming the directory it
   couldn't read. Same `ENOENT` exemption, since a file that vanished mid-walk
   really is gone.
+
+- **Both servers line-buffer stdout.** The C side has always called
+  `setvbuf(stdout, NULL, _IOLBF, 0)`; `sync_server.py` did not, so with its
+  output redirected to a file — a log, a service manager — Python block-buffered
+  and the log stayed *completely empty*, startup banner included, until the
+  process exited. Found while checking that the frame-cap refusal was logged: it
+  was, and nothing was visible. Both now reconfigure stdout at startup.
 
 - **Smaller sharp edges.** `safe_path` uses `strtok_r` rather than `strtok`,
   whose cursor lives in one static slot shared by every caller. Ports are parsed

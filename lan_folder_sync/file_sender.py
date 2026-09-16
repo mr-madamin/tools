@@ -9,6 +9,7 @@ path = sys.argv[2] if len(sys.argv) > 2 else "bigfile.bin"
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((HOST, PORT))
-send_file(sock, ".", path)
+if send_file(sock, ".", path):
+    print(f"  ! {path} changed while being sent; the copy is padded or clipped")
 print(f"Sent {path}")
 sock.close()

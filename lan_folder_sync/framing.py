@@ -11,6 +11,18 @@ import struct
 MAX_FILE_SIZE = 64 * 1024 * 1024 * 1024  # 64 GiB per file
 MAX_MTIME = 1e15  # far past any real clock
 
+# The length prefix is 4 bytes, so a peer can claim up to 4 GB before sending a
+# single byte of payload - and this ran before the HELLO. Two ceilings, because
+# the two directions carry very different frames: a MANIFEST lists every file in
+# the folder, while everything else is a short header. The server only ever
+# reads the short kind.
+MAX_FRAME = 64 * 1024 * 1024  # a manifest of a huge folder
+MAX_CONTROL_FRAME = 1024 * 1024  # HELLO / PUT / DELETE / BYE
+
+
+class FrameTooLarge(Exception):
+    """A peer declared a frame bigger than we are willing to read."""
+
 
 def recv_exactly(conn, n):
     chunks = []
@@ -36,32 +48,69 @@ def send_msg(conn, payload: bytes):
     conn.sendall(header + payload)
 
 
-def recv_msg(conn):
-    """Read one framed message. Returns the payload bytes, or None on EOF."""
+def recv_msg(conn, max_bytes=MAX_FRAME):
+    """Read one framed message. Returns the payload bytes, or None on EOF.
+
+    Raises FrameTooLarge if the peer declares more than max_bytes. The payload
+    is then left unread, so the stream has no boundary left to resync on and
+    every caller must end the session.
+    """
     header = recv_exactly(conn, 4)
     if header is None:
         return None
     (length,) = struct.unpack("!I", header)
+    if length > max_bytes:
+        raise FrameTooLarge(length)
     return recv_exactly(conn, length)
 
 
 def send_file(conn, root_dir, rel_path):
-    """Send one file as a PUT: JSON header {path, size, mtime}, then raw body."""
+    """Send one file as a PUT: JSON header {path, size, mtime}, then raw body.
+
+    Returns True if the file changed size while we were reading it.
+
+    The body is the only unframed part of the stream - the receiver finds the
+    next frame by counting exactly `size` bytes. Send one byte too few or too
+    many and it reads the following header as file content, silently corrupting
+    every later file in the session. The file can change underneath us at any
+    point, so the declared size is the contract and this honours it even when
+    the file stops matching.
+    """
     full_path = os.path.join(root_dir, rel_path)
-    size = os.path.getsize(full_path)
-    mtime = os.path.getmtime(full_path)
-    meta = json.dumps(
-        {"op": "PUT", "path": rel_path, "size": size, "mtime": mtime}
-    ).encode("utf-8")
 
-    send_msg(conn, meta)
-
+    # Open first, then fstat the handle we actually hold: getsize()-then-open()
+    # lets the path be replaced in between, and we would declare one file's size
+    # while sending another's bytes.
     with open(full_path, "rb") as f:
-        while True:
-            chunk = f.read(65536)
+        info = os.fstat(f.fileno())
+        size = info.st_size
+        mtime = info.st_mtime
+
+        meta = json.dumps(
+            {"op": "PUT", "path": rel_path, "size": size, "mtime": mtime}
+        ).encode("utf-8")
+        send_msg(conn, meta)
+
+        sent = 0
+        truncated = False
+        while sent < size:
+            chunk = f.read(min(65536, size - sent))
             if chunk == b"":
-                break
+                # Truncated mid-transfer. We already promised `size` bytes, so
+                # pad - aborting would leave the receiver waiting for bytes that
+                # never come and kill the whole session over one file. The
+                # padded copy loses the mtime comparison on the next push and
+                # gets resent, so this self-heals.
+                chunk = b"\0" * (size - sent)
+                truncated = True
             conn.sendall(chunk)
+            sent += len(chunk)
+
+        # If the file GREW we simply stop at `size` and never read the tail -
+        # the frame is still exactly as long as advertised.
+        grew = os.fstat(f.fileno()).st_size != size
+
+    return truncated or grew
 
 
 def _checked_number(header, field, low, high):
@@ -171,7 +220,7 @@ def recv_file_body(conn, dest_dir, header):
 
 def recv_file(conn, dest_dir):
     """Read a PUT header, then its body."""
-    header_bytes = recv_msg(conn)
+    header_bytes = recv_msg(conn, MAX_CONTROL_FRAME)
     if header_bytes is None:
         return None
     header = json.loads(header_bytes.decode("utf-8"))
@@ -244,7 +293,7 @@ def handshake(conn, token):
     (e.g. {"op": "OK"} or {"op": "ERROR", ...}), or None if the peer closed.
     Caller decides what to do with a non-OK reply"""
     send_msg(conn, json.dumps({"op": "HELLO", "token": token}).encode("utf-8"))
-    reply = recv_msg(conn)
+    reply = recv_msg(conn, MAX_CONTROL_FRAME)  # OK or ERROR
     if reply is None:
         return None
     return json.loads(reply.decode("utf-8"))

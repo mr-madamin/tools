@@ -6,6 +6,8 @@ import time
 
 from config import load_config
 from framing import (
+    MAX_FRAME,
+    FrameTooLarge,
     build_manifest,
     diff_manifests,
     handshake,
@@ -36,6 +38,11 @@ if unknown:
         "usage: sync_push.py [peer_host] [root_dir] "
         f"[{' | '.join(sorted(KNOWN_FLAGS))}]"
     )
+
+# Line-buffer stdout: redirected to a file or a service manager, Python
+# block-buffers and the log stays empty until the process exits. The C
+# port spells this setvbuf(stdout, NULL, _IOLBF, 0).
+sys.stdout.reconfigure(line_buffering=True)
 
 cfg = load_config()
 TOKEN = cfg["token"]
@@ -209,9 +216,15 @@ local = build_manifest(ROOT_DIR, walk_errors)
 
 send_msg(sock, json.dumps({"op": "MANIFEST"}).encode("utf-8"))
 try:
-    reply = recv_msg(sock)
+    reply = recv_msg(sock)  # the manifest: MAX_FRAME, not the control cap
 except TimeoutError:
     sys.exit(silent_peer_help("MANIFEST"))
+except FrameTooLarge as e:
+    sys.exit(
+        f"peer's manifest frame is {e} bytes, over the {MAX_FRAME} cap --\n"
+        f"refusing to read it. That's not a folder listing; check what is\n"
+        f"actually listening on {HOST}:{PORT}."
+    )
 if reply is None:
     sys.exit("Connection closed by peer before manifest was received")
 remote = json.loads(reply.decode("utf-8"))["files"]
@@ -254,7 +267,11 @@ for path in to_put:
     print(f"   PUT    {path} ({human(size)})", flush=True)
     if not dry_run:
         try:
-            send_file(sock, ROOT_DIR, path)
+            changed = send_file(sock, ROOT_DIR, path)
+            if changed:
+                hint(f"{path} changed while it was being sent -- the copy on the")
+                hint("peer is padded or clipped to the size we announced.")
+                hint("Re-run to fix it.")
         except TimeoutError:
             sys.exit(
                 f"stalled for {TRANSFER_TIMEOUT}s while sending {path!r}.\n"
