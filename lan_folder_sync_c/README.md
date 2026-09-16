@@ -270,6 +270,15 @@ Same guarantees as the Python version, plus one:
   process exited. Found while checking that the frame-cap refusal was logged: it
   was, and nothing was visible. Both now reconfigure stdout at startup.
 
+- **A skipped symlink is reported, not swallowed.** Symlinked directories
+  aren't followed — `os.walk` doesn't either, and that parity is deliberate —
+  but skipping them in silence is its own failure: symlink a folder into your
+  sync directory and the push says `Local: 1 files`, transfers nothing from it,
+  and never mentions why. The manifest now carries the names it passed over
+  (broken links too, which can't be read at all), the push lists them, and the
+  server notes the count. A symlink to a *file* is still synced, stat'd through
+  the link, exactly as before. `symlink_test` covers all four cases.
+
 - **Smaller sharp edges.** `safe_path` uses `strtok_r` rather than `strtok`,
   whose cursor lives in one static slot shared by every caller. Ports are parsed
   with `strtol` and range-checked on both the command line and in `config.json`
@@ -350,7 +359,9 @@ make tests
 ./bin/delete_test
 ./bin/nasty_test             # self-contained — needs no server
 ./bin/truncate_test          # self-contained
+./bin/symlink_test           # self-contained
 ./bin/atomic_test
+./bin/partial_test
 ```
 
 ### Cross-checking against the Python implementation

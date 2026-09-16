@@ -259,6 +259,10 @@ static void serve_session(int conn, const char *shared_dir, const char *token)
                 printf("Sent manifest (%zu files) - WARNING: some directories "
                        "under %s could not be read; the list is incomplete\n",
                        m.count, shared_dir);
+            else if (m.skipped_links.count > 0)
+                printf("Sent manifest (%zu files, %zu symlink%s skipped)\n",
+                       m.count, m.skipped_links.count,
+                       m.skipped_links.count == 1 ? "" : "s");
             else
                 printf("Sent manifest (%zu files)\n", m.count);
             manifest_free(&m);

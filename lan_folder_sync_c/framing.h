@@ -88,6 +88,11 @@ typedef struct {
     manifest_entry *items;
     size_t count;
     size_t cap;
+    /* Symlinked directories are deliberately not followed (os.walk doesn't
+       either), but skipping them in silence means a user who symlinks a folder
+       into their sync directory sees nothing sync and is told nothing. Record
+       them so the caller can say so. */
+    strlist skipped_links;
 } manifest;
 
 void manifest_init(manifest *m);

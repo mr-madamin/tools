@@ -542,6 +542,7 @@ void manifest_init(manifest *m)
 {
     m->items = NULL;
     m->count = m->cap = 0;
+    sl_init(&m->skipped_links);
 }
 
 void manifest_free(manifest *m)
@@ -549,6 +550,7 @@ void manifest_free(manifest *m)
     for (size_t i = 0; i < m->count; i++)
         free(m->items[i].path);
     free(m->items);
+    sl_free(&m->skipped_links);
     manifest_init(m);
 }
 
@@ -616,9 +618,23 @@ static int walk(const char *full, strbuf *prefix, manifest *m)
             /* os.walk doesn't follow symlinked directories; a symlinked file
                still shows up, stat()ed through the link. */
             struct stat st;
-            if (stat(child, &st) == 0 && !S_ISDIR(st.st_mode))
+            if (stat(child, &st) != 0)
+            {
+                /* A broken link. It isn't a file we can send, and it isn't a
+                   directory we failed to read, so it is not an error — but the
+                   user should hear about it rather than wonder. */
+                sl_push(&m->skipped_links, xstrdup(prefix->data));
+            }
+            else if (S_ISDIR(st.st_mode))
+            {
+                /* Points at a real directory we are choosing not to follow. */
+                sl_push(&m->skipped_links, xstrdup(prefix->data));
+            }
+            else
+            {
                 manifest_push(m, xstrdup(prefix->data), (long long)st.st_size,
                               stat_mtime(&st));
+            }
         }
         else
         {

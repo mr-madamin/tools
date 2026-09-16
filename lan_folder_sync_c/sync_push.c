@@ -295,6 +295,18 @@ int main(int argc, char **argv)
 
     /* An empty source is almost always a wrong path, not a real "delete
        everything" — refuse to mirror it. --dry-run still shows the plan. */
+    /* Not an error — we chose not to follow them — but a user who symlinked a
+       folder in here is otherwise told nothing about why it never syncs. */
+    if (local.skipped_links.count > 0) {
+        hint("skipped %zu symlink%s -- a link to a directory isn't followed",
+             local.skipped_links.count,
+             local.skipped_links.count == 1 ? "" : "s");
+        hint("(same as Python's os.walk), and a broken link can't be read:");
+        for (size_t i = 0; i < local.skipped_links.count; i++)
+            hint("    %s", local.skipped_links.items[i]);
+        hint("copy the folder in, or sync it separately, if you want it mirrored");
+    }
+
     /* A directory we could not read is not the same as a directory with
        nothing in it: the files are there, we just can't see them. Deleting on
        the peer from a picture we know is incomplete is the empty-source wipe
