@@ -134,6 +134,16 @@ wider than the thing it was there for. It isn't zero, because a filesystem that
 stores coarser timestamps would then resend every file on every run — a worse
 failure than a 1 ms gap.
 
+**What size + mtime cannot see.** A file whose content changes while its size
+*and* mtime both stay the same is invisible to the diff, permanently. That
+isn't a narrow float problem like the one above — it's inherent to the
+heuristic, and `rsync` behaves the same way (hence its `--checksum`). Reaching
+it takes a tool that deliberately preserves timestamps: `touch -r`, `cp -p`,
+or extracting an archive over the folder, since `tar` and `unzip` restore the
+stored mtime. Ordinary editing always moves the mtime, so normal use is safe.
+If you've done something like that, the fix today is to touch the affected
+files so their mtime moves, and re-push.
+
 ## 7. Safety notes
 
 Same guarantees as the Python version, plus one:
