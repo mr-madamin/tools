@@ -279,6 +279,16 @@ Same guarantees as the Python version, plus one:
   server notes the count. A symlink to a *file* is still synced, stat'd through
   the link, exactly as before. `symlink_test` covers all four cases.
 
+- **A mistyped `config.json` value names itself.** `json_get_str()` returns
+  NULL both when a key is absent and when it's present but the wrong type, so
+  every mistyped value used to fall through to a default in silence. Quoting the
+  port by mistake — `"port": "9999"` — simply gave you 8765 and then a
+  "connection refused" with nothing pointing at the config; `"token": 12345`
+  reported `missing "token"`, sending you to look for a key that was right
+  there. Absent is still fine (the defaults are the point); wrong type now
+  stops with the key named. `config_test` covers it — `config.c` is
+  hand-edited by every user and had no test at all before.
+
 - **Smaller sharp edges.** `safe_path` uses `strtok_r` rather than `strtok`,
   whose cursor lives in one static slot shared by every caller. Ports are parsed
   with `strtol` and range-checked on both the command line and in `config.json`
@@ -360,6 +370,7 @@ make tests
 ./bin/nasty_test             # self-contained — needs no server
 ./bin/truncate_test          # self-contained
 ./bin/symlink_test           # self-contained
+./bin/config_test            # self-contained
 ./bin/atomic_test
 ./bin/partial_test
 ```

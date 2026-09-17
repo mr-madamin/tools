@@ -52,6 +52,22 @@ static char *find_config(const char *argv0)
     return NULL;
 }
 
+/* json_get_str() returns NULL both when a key is absent and when it's present
+   but isn't a string, so every mistyped value used to fall through to a default
+   in silence: "port": "9999" (quoted by mistake) simply became 8765, and the
+   user got "connection refused" with nothing pointing at config.json. Tell the
+   two apart — absent is fine, wrong type is a typo worth naming. */
+static const char *cfg_str(const json_value *obj, const char *key,
+                           const char *path, const char *where)
+{
+    const json_value *v = json_get(obj, key);
+    if (v == NULL || v->type == JSON_NULL)
+        return NULL; /* genuinely absent — the caller decides if that's ok */
+    if (v->type != JSON_STRING)
+        die("%s: \"%s\" must be a string, in double quotes", path, where);
+    return v->string;
+}
+
 config *load_config(const char *argv0)
 {
     char *path = find_config(argv0);
@@ -72,27 +88,35 @@ config *load_config(const char *argv0)
     config *cfg = xmalloc(sizeof(*cfg));
     memset(cfg, 0, sizeof(*cfg));
 
-    const char *s = json_get_str(root, "shared_dir");
+    const char *s = cfg_str(root, "shared_dir", path, "shared_dir");
     if (s != NULL)
         cfg->shared_dir = xstrdup(s);
 
-    s = json_get_str(root, "token");
+    s = cfg_str(root, "token", path, "token");
     if (s == NULL)
         die("%s: missing \"token\"", path);
     cfg->token = xstrdup(s);
 
     const json_value *peer = json_get(root, "peer");
-    if (peer != NULL) {
-        s = json_get_str(peer, "host");
+    if (peer != NULL && peer->type != JSON_NULL) {
+        if (peer->type != JSON_OBJECT)
+            die("%s: \"peer\" must be an object, like "
+                "{\"host\": \"192.168.1.42\", \"port\": 8765}",
+                path);
+
+        s = cfg_str(peer, "host", path, "peer.host");
         if (s != NULL)
             cfg->peer_host = xstrdup(s);
-        double port;
-        if (json_get_num(peer, "port", &port)) {
+
+        const json_value *port = json_get(peer, "port");
+        if (port != NULL && port->type != JSON_NULL) {
+            if (port->type != JSON_NUMBER)
+                die("%s: peer.port must be a number, not in quotes", path);
             /* Same range check as the command line; a JSON double also has to
                survive the cast to int, so reject inf/NaN before it. */
-            if (!(port >= 1 && port <= 65535))
+            if (!(port->number >= 1 && port->number <= 65535))
                 die("%s: peer.port must be 1-65535", path);
-            cfg->peer_port = (int)port;
+            cfg->peer_port = (int)port->number;
         }
     }
 
