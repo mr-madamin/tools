@@ -102,7 +102,17 @@ int build_manifest(const char *root_dir, manifest *m);
 char *manifest_to_json(const manifest *m);              /* the {"files": ...} value */
 int manifest_from_json(const json_value *files, manifest *m);
 
-#define MTIME_TOLERANCE 2.0
+/* A file counts as unchanged when size AND mtime match. The window exists only
+   to absorb timestamp round-trip error, and that error is tiny: measured at
+   under 1 microsecond both C-to-C and C-to-Python. It used to be 2 SECONDS,
+   which silently swallowed real edits — change a file without changing its
+   size, land the new mtime within 2 s of the peer's copy, and the diff called
+   it unchanged forever, because the two mtimes never drift further apart.
+   1 ms is a thousand times the observed error and a two-thousandth of the old
+   blind spot. Not zero: a filesystem that stores coarser timestamps (FAT, some
+   network mounts) would then resend every file on every run, which is a worse
+   failure than a 1 ms gap. */
+#define MTIME_TOLERANCE 0.001
 
 void diff_manifests(const manifest *local, const manifest *remote, double tolerance,
                     strlist *to_put, strlist *to_delete);

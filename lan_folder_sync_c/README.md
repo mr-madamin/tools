@@ -122,8 +122,17 @@ part of the stream that isn't framed, which is why a `PUT` header missing its
 | `BYE` | client → server | ends the session |
 | `ERROR` | server → client | `{"op":"ERROR","message":…}`, then close |
 
-`mtime` is seconds as a JSON float; the diff treats a difference of ≤ 2 s as
-unchanged, so the two languages' clock precision doesn't cause spurious resends.
+`mtime` is seconds as a JSON float. The diff treats a file as unchanged when
+size *and* mtime match, with a 1 ms window to absorb timestamp round-trip error.
+
+That window used to be **2 seconds**, and it silently swallowed real edits:
+change a file without changing its size, land the new mtime within 2 s of the
+peer's copy, and the diff called it unchanged — permanently, because the two
+mtimes never drift further apart. Measured, the actual round-trip error is under
+one microsecond (both C→C and C→Python), so 2 s was six orders of magnitude
+wider than the thing it was there for. It isn't zero, because a filesystem that
+stores coarser timestamps would then resend every file on every run — a worse
+failure than a 1 ms gap.
 
 ## 7. Safety notes
 
@@ -288,6 +297,14 @@ Same guarantees as the Python version, plus one:
   there. Absent is still fine (the defaults are the point); wrong type now
   stops with the key named. `config_test` covers it — `config.c` is
   hand-edited by every user and had no test at all before.
+
+- **Editing a header rebuilds what uses it.** The Makefile listed only `.c`
+  files as prerequisites, so touching `framing.h` recompiled *nothing* —
+  `make check` could pass against stale objects that didn't contain the change
+  under test. It bit during this very session: the mtime fix above appeared not
+  to work, because the binary still held the old constant. `-MMD -MP` now emits
+  a `.d` per object and the Makefile `-include`s them; touching `framing.h`
+  rebuilds all five dependants.
 
 - **Smaller sharp edges.** `safe_path` uses `strtok_r` rather than `strtok`,
   whose cursor lives in one static slot shared by every caller. Ports are parsed
