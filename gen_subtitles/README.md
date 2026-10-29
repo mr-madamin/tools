@@ -6,9 +6,6 @@ Pipeline: **FFmpeg** (pick + extract the audio track) → **`faster-whisper`**
 (transcribe) → **wav2vec2 forced alignment** (exact word timings) →
 subtitle-friendly `.srt`.
 
-A step-by-step learning build — see [PLAN.md](PLAN.md) for the milestones, the
-AI/Python concepts behind each, and the working style.
-
 > **Status:** 🚧 Early build. Milestone 1 (skeleton) first. The commands below are
 > the planned interface and will light up as the milestones land.
 
