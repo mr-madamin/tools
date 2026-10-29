@@ -1,7 +1,7 @@
 [project]
 name = "gen-subtitles"
 version = "0.1.0"
-description = "Add your description here"
+description = "Generate .srt subtitles from video files, in any language"
 readme = "README.md"
 authors = [
     { name = "Daler", email = "8993696+mr-madamin@users.noreply.github.com" }
