@@ -1,3 +1,13 @@
+from dataclasses import dataclass
+
+
+@dataclass
+class Cue:
+    start: float  # seconds
+    end: float  # seconds
+    text: str
+
+
 def format_timestamp(seconds: float) -> str:
     total_ms = round(seconds * 1000)
     s, ms = divmod(total_ms, 1000)
