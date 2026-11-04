@@ -24,7 +24,7 @@ def test_cues_compare_by_value():
     assert Cue(0.0, 1.0, "hi") == Cue(0.0, 1.0, "hi")
 
 
-def test_cues_write(tmp_path):
+def test_write_srt(tmp_path):
     path = tmp_path / "test.srt"
     cues = [
         Cue(0.0, 1.0, "Hello there!"),
@@ -40,3 +40,9 @@ def test_cues_write(tmp_path):
     write_srt(cues, path)
     data = path.read_text(encoding="utf-8")
     assert data == expected
+
+
+def test_write_srt_handles_non_ascii(tmp_path):
+    path = tmp_path / "es.srt"
+    write_srt([Cue(0.0, 1.0, "¿Dónde estás, señor?")], path)
+    assert "¿Dónde estás, señor?" in path.read_text(encoding="utf-8")
