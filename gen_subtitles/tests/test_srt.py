@@ -1,4 +1,4 @@
-from gen_subtitles.srt import Cue, format_timestamp
+from gen_subtitles.srt import Cue, format_timestamp, write_srt
 
 
 def test_format_timestamp_zero():
@@ -22,3 +22,21 @@ def test_cue_holds_its_fields():
 
 def test_cues_compare_by_value():
     assert Cue(0.0, 1.0, "hi") == Cue(0.0, 1.0, "hi")
+
+
+def test_cues_write(tmp_path):
+    path = tmp_path / "test.srt"
+    cues = [
+        Cue(0.0, 1.0, "Hello there!"),
+        Cue(2.0, 3.5, "Hi! How are you?"),
+        Cue(4.1, 5.2, "Fine"),
+    ]
+    expected = (
+        "1\n00:00:00,000 --> 00:00:01,000\nHello there!\n\n"
+        "2\n00:00:02,000 --> 00:00:03,500\nHi! How are you?\n\n"
+        "3\n00:00:04,100 --> 00:00:05,200\nFine\n\n"
+    )
+
+    write_srt(cues, path)
+    data = path.read_text(encoding="utf-8")
+    assert data == expected
