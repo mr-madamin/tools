@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
@@ -16,10 +17,7 @@ def format_timestamp(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
-def write_srt(cues, path):
-    if path is None:
-        raise ValueError(f"path wasn't provided: {path!r}")
-
+def write_srt(cues: list[Cue], path: str | Path) -> None:
     blocks = []
     for i, cue in enumerate(cues, start=1):
         blocks.append(
