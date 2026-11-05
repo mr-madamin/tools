@@ -13,6 +13,10 @@ def test_format_timestamp_rounding_rollover():
     assert format_timestamp(59.9995) == "00:01:00,000"
 
 
+def test_format_timestamp_past_one_hour():
+    assert format_timestamp(3661.0) == "01:01:01,000"
+
+
 def test_cue_holds_its_fields():
     c = Cue(4.5, 7.25, "¿Dónde estás?")
     assert c.start == 4.5
