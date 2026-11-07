@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+class ProbeError(Exception):
+    """ffprobe failed to read a file."""
+
+
 @dataclass
 class AudioTrack:
     index: int
@@ -17,22 +21,27 @@ class AudioTrack:
 def probe_tracks(path: str | Path) -> list[AudioTrack]:
     streams = []
 
-    result = subprocess.run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-print_format",
-            "json",
-            "-show_streams",
-            "-select_streams",
-            "a",
-            str(path),
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    try:
+        result = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-print_format",
+                "json",
+                "-show_streams",
+                "-select_streams",
+                "a",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except FileNotFoundError:
+        raise ProbeError("ffprobe not found - is ffmpeg installed and on PATH?")
+    except subprocess.CalledProcessError as e:
+        raise ProbeError(f"ffprobe failed for {path}:\n{e.stderr.strip()}")
 
     data = json.loads(result.stdout)
 
