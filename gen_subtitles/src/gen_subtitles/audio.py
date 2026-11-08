@@ -18,9 +18,26 @@ class AudioTrack:
     title: str | None = None
 
 
-def probe_tracks(path: str | Path) -> list[AudioTrack]:
+def _parse_streams(data: dict) -> list[AudioTrack]:
     streams = []
+    for stream in data["streams"]:
+        tags = stream.get("tags", {})
+        language = tags.get("language")
+        title = tags.get("title")
+        parsed = {
+            "index": stream["index"],
+            "codec_name": stream["codec_name"],
+            "channels": stream["channels"],
+            "sample_rate": int(stream["sample_rate"]),
+            "language": language if language != "und" else None,
+            "title": title,
+        }
+        streams.append(AudioTrack(**parsed))
 
+    return streams
+
+
+def probe_tracks(path: str | Path) -> list[AudioTrack]:
     try:
         result = subprocess.run(
             [
@@ -45,18 +62,4 @@ def probe_tracks(path: str | Path) -> list[AudioTrack]:
 
     data = json.loads(result.stdout)
 
-    for stream in data["streams"]:
-        tags = stream.get("tags", {})
-        language = tags.get("language")
-        title = tags.get("title")
-        parsed = {
-            "index": stream["index"],
-            "codec_name": stream["codec_name"],
-            "channels": stream["channels"],
-            "sample_rate": int(stream["sample_rate"]),
-            "language": language if language != "und" else None,
-            "title": title,
-        }
-        streams.append(AudioTrack(**parsed))
-
-    return streams
+    return _parse_streams(data)
